@@ -1,0 +1,9 @@
+RewriteEngine On
+RewriteBase /sistemaagenda/
+
+# Não redireciona se for um arquivo real (CSS, JS, Imagens, PWA Manifest)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Captura tudo após a barra e envia para o index.php como o parâmetro 'url'
+RewriteRule ^(.*)$ index.php?url=$1 [QSA,L]
