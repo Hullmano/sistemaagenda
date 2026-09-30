@@ -24,7 +24,6 @@ if ($barbearia) {
     $barbearia_nome = $barbearia['nome'];
     
     // Dentro do if ($barbearia) no seu index.php
-    // Dentro do if ($barbearia) no seu index.php
     if (isset($partes[1]) && $partes[1] === 'admin') {
         
         if (isset($partes[2]) && $partes[2] === 'servicos') {

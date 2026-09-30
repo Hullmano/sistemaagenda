@@ -8,7 +8,7 @@ class Database {
             $host = '127.0.0.1';
             //$db   = 'sistema_barbearia';
             $db = 'saas_barbearia';
-            $user = 'root';
+            $user = 'system_user';
             $pass = 'myN&wPa$$.db';
             $charset = 'utf8mb4';
 
