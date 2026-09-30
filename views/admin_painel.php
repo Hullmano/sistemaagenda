@@ -118,13 +118,13 @@ foreach ($agendamentos_hoje as $ag) {
             </div>
             <div class="d-flex gap-2">
                 <!-- LINK PARA OS SERVIÇOS -->
-                <a href="/<?php echo $slug_filtrado; ?>/admin/servicos" class="btn btn-sm btn-dark border-secondary text-warning rounded-3 px-3 py-2 text-decoration-none d-flex align-items-center">
+                <a href="/agenda/<?php echo $slug_filtrado; ?>/admin/servicos" class="btn btn-sm btn-dark border-secondary text-warning rounded-3 px-3 py-2 text-decoration-none d-flex align-items-center">
                     <i class="fa-solid fa-tags me-1"></i> Serviços
                 </a>
                 <button class="btn btn-sm btn-dark border-secondary text-white rounded-3 px-3 py-2" onclick="window.location.reload();">
                     <i class="fa-solid fa-arrows-rotate"></i>
                 </button>
-                <a href="/<?php echo $slug_filtrado; ?>/admin/horarios" class="btn btn-sm btn-dark border-secondary text-warning rounded-3 px-3 py-2 text-decoration-none d-flex align-items-center">
+                <a href="/agenda/<?php echo $slug_filtrado; ?>/admin/horarios" class="btn btn-sm btn-dark border-secondary text-warning rounded-3 px-3 py-2 text-decoration-none d-flex align-items-center">
                     <i class="fa-solid fa-clock me-1"></i> Horários
                 </a>
             </div>

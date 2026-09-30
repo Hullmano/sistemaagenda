@@ -35,7 +35,7 @@ $dias_nome = [
     <!-- Navbar -->
     <nav class="navbar navbar-custom sticky-top py-3">
         <div class="container-fluid mx-auto d-flex justify-content-between align-items-center" style="max-width: 480px;">
-            <a href="/<?php echo $slug_filtrado; ?>/admin" class="text-secondary text-decoration-none small">
+            <a href="/agenda/<?php echo $slug_filtrado; ?>/admin" class="text-secondary text-decoration-none small">
                 <i class="fa-solid fa-chevron-left me-1"></i> Painel
             </a>
             <span class="fw-bold text-white">Horários de Trabalho</span>
