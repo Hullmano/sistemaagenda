@@ -228,7 +228,7 @@ foreach ($agendamentos_hoje as $ag) {
 
                     // Envia a requisição AJAX via POST para a API [1]
                     // No dropet do fetch, usamos o caminho relativo correto para a API
-                    fetch('/sistemaagenda/api/atualizar_status.php', {
+                    fetch('/agenda/api/atualizar_status.php', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ id: agendamentoId, status: novoStatus })

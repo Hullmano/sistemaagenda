@@ -43,54 +43,60 @@ $dias_nome = [
         </div>
     </nav>
 
-    <!-- Conteúdo Principal -->
+    <!-- Conteúdo Principal Refatorado -->
     <main class="container py-4" style="max-width: 480px;">
-        <h5 class="fw-bold mb-4">Configurar Turnos</h5>
+        <div class="mb-4">
+            <h4 class="fw-bold m-0" style="letter-spacing: -0.5px;">Horários de Trabalho</h4>
+            <p class="text-muted small m-0">Defina os turnos de atendimento para cada dia</p>
+        </div>
 
-        <div class="space-y-4">
+        <div class="d-flex flex-column gap-3"> <!-- Criado um container de espaçamento vertical real -->
             <?php foreach($dias_nome as $num_dia => $nome_dia): 
-                // Verifica se já existe configuração para este dia no banco
                 $config = $horarios_banco[$num_dia] ?? null;
                 $aberto = $config ? true : false;
             ?>
-                <div class="horario-card p-3 mb-3 shadow-sm">
+                <div class="horario-card p-3 shadow-sm border border-secondary" style="--bs-border-opacity: .15;">
                     <form class="form-horario">
                         <input type="hidden" name="barbearia_id" value="<?php echo $barbearia_id; ?>">
                         <input type="hidden" name="dia_semana" value="<?php echo $num_dia; ?>">
 
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="fw-bold m-0 text-warning"><?php echo $nome_dia; ?></h6>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input check-aberto" type="checkbox" role="switch" <?php echo $aberto ? 'checked' : ''; ?>>
-                                <small class="text-secondary label-status"><?php echo $aberto ? 'Abre' : 'Fechado'; ?></small>
+                        <div class="d-flex justify-content-between align-items-center pb-2 mb-3 border-bottom border-secondary" style="--bs-border-opacity: .1;">
+                            <h6 class="fw-bold m-0 text-white fs-6"><?php echo $nome_dia; ?></h6>
+                            <div class="form-check form-switch d-flex align-items-center gap-2">
+                                <input class="form-check-input check-aberto" type="checkbox" role="switch" <?php echo $aberto ? 'checked' : ''; ?> style="cursor: pointer;">
+                                <small class="text-secondary fw-semibold label-status" style="min-width: 50px; display: inline-block; text-align: right;">
+                                    <?php echo $aberto ? 'Abre' : 'Fechado'; ?>
+                                </small>
                             </div>
                         </div>
 
-                        <!-- Campos de Horário (Só aparecem/habilitam se o switch estiver ativo) -->
+                        <!-- Campos com grid corrigida para não quebrar no mobile -->
                         <div class="campos-turno <?php echo $aberto ? '' : 'd-none'; ?>">
-                            <div class="row g-2 mb-2">
+                            <div class="row g-2 mb-3">
                                 <div class="col-6">
-                                    <label class="text-secondary text-xs d-block mb-1">Abertura</label>
-                                    <input type="time" name="hora_abertura" class="form-control input-custom" value="<?php echo $config ? date('H:i', strtotime($config['hora_abertura'])) : '08:00'; ?>" required>
+                                    <label class="text-secondary fw-medium d-block mb-1" style="font-size: 0.75rem;">Expediente (Início)</label>
+                                    <input type="time" name="hora_abertura" class="form-control input-custom py-2" value="<?php echo $config ? date('H:i', strtotime($config['hora_abertura'])) : '08:00'; ?>" required>
                                 </div>
                                 <div class="col-6">
-                                    <label class="text-secondary text-xs d-block mb-1">Fechamento</label>
-                                    <input type="time" name="hora_fechamento" class="form-control input-custom" value="<?php echo $config ? date('H:i', strtotime($config['hora_fechamento'])) : '18:00'; ?>" required>
-                                </div>
-                            </div>
-                            <div class="row g-2">
-                                <div class="col-6">
-                                    <label class="text-secondary text-xs d-block mb-1">Início Almoço</label>
-                                    <input type="time" name="hora_almoco_inicio" class="form-control input-custom" value="<?php echo ($config && $config['hora_almoco_inicio']) ? date('H:i', strtotime($config['hora_almoco_inicio'])) : ''; ?>">
-                                </div>
-                                <div class="col-6">
-                                    <label class="text-secondary text-xs d-block mb-1">Fim Almoço</label>
-                                    <input type="time" name="hora_almoco_fim" class="form-control input-custom" value="<?php echo ($config && $config['hora_almoco_fim']) ? date('H:i', strtotime($config['hora_almoco_fim'])) : ''; ?>">
+                                    <label class="text-secondary fw-medium d-block mb-1" style="font-size: 0.75rem;">Expediente (Fim)</label>
+                                    <input type="time" name="hora_fechamento" class="form-control input-custom py-2" value="<?php echo $config ? date('H:i', strtotime($config['hora_fechamento'])) : '18:00'; ?>" required>
                                 </div>
                             </div>
-                            <div class="d-flex justify-content-end mt-3">
-                                <button type="submit" class="btn btn-sm btn-warning fw-bold text-dark px-3 rounded-2">
-                                    <i class="fa-solid fa-floppy-disk me-1"></i> Salvar Dia
+                            
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <label class="text-secondary fw-medium d-block mb-1" style="font-size: 0.75rem;">Almoço (Início)</label>
+                                    <input type="time" name="hora_almoco_inicio" class="form-control input-custom py-2" value="<?php echo ($config && $config['hora_almoco_inicio']) ? date('H:i', strtotime($config['hora_almoco_inicio'])) : ''; ?>">
+                                </div>
+                                <div class="col-6">
+                                    <label class="text-secondary fw-medium d-block mb-1" style="font-size: 0.75rem;">Almoço (Fim)</label>
+                                    <input type="time" name="hora_almoco_fim" class="form-control input-custom py-2" value="<?php echo ($config && $config['hora_almoco_fim']) ? date('H:i', strtotime($config['hora_almoco_fim'])) : ''; ?>">
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-end pt-2">
+                                <button type="submit" class="btn btn-sm btn-warning fw-bold text-dark px-3 py-2 rounded-3 shadow-sm" style="font-size: 0.8rem;">
+                                    <i class="fa-solid fa-floppy-disk me-1"></i> Salvar Configuração
                                 </button>
                             </div>
                         </div>
@@ -99,6 +105,7 @@ $dias_nome = [
             <?php endforeach; ?>
         </div>
     </main>
+
 
     <script src="https://jsdelivr.net"></script>
     <script>
@@ -121,7 +128,7 @@ $dias_nome = [
                     const barbeariaId = card.querySelector('input[name="barbearia_id"]').value;
                     const diaSemana = card.querySelector('input[name="dia_semana"]').value;
                     
-                    fetch('/sistemaagenda/api/salvar_horario.php', {
+                    fetch('/agenda/api/salvar_horario.php', {
                         method: 'POST',
                         body: JSON.stringify({ barbearia_id: barbeariaId, dia_semana: diaSemana, acao: 'fechar' }),
                         headers: { 'Content-Type': 'application/json' }
@@ -137,7 +144,7 @@ $dias_nome = [
                 const formData = Object.fromEntries(new FormData(this));
                 formData.acao = 'salvar';
 
-                fetch('/sistemaagenda/api/salvar_horario.php', {
+                fetch('/agenda/api/salvar_horario.php', {
                     method: 'POST',
                     body: JSON.stringify(formData),
                     headers: { 'Content-Type': 'application/json' }

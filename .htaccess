@@ -1,5 +1,5 @@
 RewriteEngine On
-RewriteBase /sistemaagenda/
+RewriteBase /agenda/
 
 # Não redireciona se for um arquivo real (CSS, JS, Imagens, PWA Manifest)
 RewriteCond %{REQUEST_FILENAME} !-f

@@ -126,7 +126,7 @@ $servicos = $stmt->fetchAll();
         e.preventDefault();
         const dadosForm = Object.fromEntries(new FormData(this));
 
-        fetch('/sistemaagenda/api/salvar_servico.php', {
+        fetch('/agenda/api/salvar_servico.php', {
             method: 'POST',
             body: JSON.stringify(dadosForm),
             headers: { 'Content-Type': 'application/json' }
@@ -143,7 +143,7 @@ $servicos = $stmt->fetchAll();
         btn.addEventListener('click', function() {
             if (!confirm('Deseja realmente remover este serviço da listagem?')) return;
 
-            fetch('/sistemaagenda/api/deletar_servico.php', {
+            fetch('/agenda/api/deletar_servico.php', {
                 method: 'POST',
                 body: JSON.stringify({ id: this.dataset.id }),
                 headers: { 'Content-Type': 'application/json' }

@@ -6,9 +6,10 @@ class Database {
     public static function getConnection() {
         if (self::$instance === null) {
             $host = '127.0.0.1';
-            $db   = 'sistema_barbearia';
+            //$db   = 'sistema_barbearia';
+            $db = 'saas_barbearia';
             $user = 'root';
-            $pass = '';
+            $pass = 'myN&wPa$$.db';
             $charset = 'utf8mb4';
 
             $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
