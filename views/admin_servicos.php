@@ -43,7 +43,7 @@ $servicos = $stmt->fetchAll();
     <!-- Topo da Página -->
     <nav class="navbar navbar-custom sticky-top py-3">
         <div class="container-fluid mx-auto d-flex justify-content-between align-items-center" style="max-width: 480px;">
-            <a href="/sistemaagenda/<?php echo $slug_filtrado; ?>/admin" class="text-secondary text-decoration-none small">
+            <a href="/<?php echo $slug_filtrado; ?>/admin" class="text-secondary text-decoration-none small">
                 <i class="fa-solid fa-chevron-left me-1"></i> Painel
             </a>
             <span class="fw-bold text-white">Serviços</span>
