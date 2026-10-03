@@ -121,7 +121,7 @@ $servicos = $stmt->fetchAll();
     </div>
 
     <!-- Scripts AJAX -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0"></script>
 
     <script>
     // Envio do formulário via AJAX para salvar
