@@ -14,9 +14,11 @@ $servicos = $stmt->fetchAll();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gerenciar Serviços - <?php echo htmlspecialchars($barbearia_nome); ?></title>
     <!-- Bootstrap 5 & Ícones -->
-    <link href="https://jsdelivr.net" rel="stylesheet">
+    <!-- Copie e cole este bloco no <head> das 3 views administrativas -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://googleapis.com" rel="stylesheet">
     <link href="https://cloudflare.com" rel="stylesheet">
+
     
     <style>
         :root {
@@ -119,7 +121,8 @@ $servicos = $stmt->fetchAll();
     </div>
 
     <!-- Scripts AJAX -->
-    <script src="https://jsdelivr.net"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"></script>
+
     <script>
     // Envio do formulário via AJAX para salvar
     document.getElementById('form-add-servico').addEventListener('submit', function(e) {

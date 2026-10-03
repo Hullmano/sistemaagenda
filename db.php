@@ -7,6 +7,9 @@ class Database {
         if (self::$instance === null) {
             $host = '127.0.0.1';
             //$db   = 'sistema_barbearia';
+            //$user = 'root';
+            //$pass = '';
+
             $db = 'saas_barbearia';
             $user = 'system_user';
             $pass = 'myN&wPa$$.db';

@@ -29,10 +29,11 @@ foreach ($agendamentos_hoje as $ag) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel Admin - <?php echo htmlspecialchars($barbearia_nome); ?></title>
     <!-- Bootstrap 5 CSS CDN -->
-    <link href="https://jsdelivr.net" rel="stylesheet">
-    <!-- Google Fonts & FontAwesome -->
+    <!-- Copie e cole este bloco no <head> das 3 views administrativas -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://googleapis.com" rel="stylesheet">
     <link href="https://cloudflare.com" rel="stylesheet">
+
     
     <style>
         :root {
@@ -206,7 +207,7 @@ foreach ($agendamentos_hoje as $ag) {
 
     </main>
 
-    <!-- <script src="https://jsdelivr.net"></script> -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"></script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function() {
