@@ -4,7 +4,7 @@ $db = \Database::getConnection();
 $data_hoje = date('Y-m-d');
 
 $stmt = $db->prepare("
-    SELECT a.id, a.horario_inicio, c.nome AS cliente_nome, c.whatsapp AS cliente_whats, s.nome AS servico_nome, s.preco, a.status 
+    SELECT a.id, a.servico_id, a.horario_inicio, c.nome AS cliente_nome, c.whatsapp AS cliente_whats, s.nome AS servico_nome, s.preco, a.status 
     FROM agendamentos a
     JOIN clientes c ON a.cliente_id = c.id
     JOIN servicos s ON a.servico_id = s.id
@@ -32,7 +32,8 @@ foreach ($agendamentos_hoje as $ag) {
     <!-- Copie e cole este bloco no <head> das 3 views administrativas -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://googleapis.com" rel="stylesheet">
-    <link href="https://cloudflare.com" rel="stylesheet">
+    <!--link href="https://cloudflare.com" rel="stylesheet"--> 
+    <script src="https://cloudflare.com" crossorigin="anonymous"></script>
 
     
     <style>
@@ -184,18 +185,26 @@ foreach ($agendamentos_hoje as $ag) {
                                 </p>
                             </div>
                             <a href="https://wa.me<?php echo $ag['cliente_whats']; ?>" target="_blank" class="btn-whatsapp">
-                                <i class="fa-brands fa-whatsapp fs-5"></i>
+                                <i class="fa-brands fa-whatsapp fs-5"></i> 
                             </a>
                         </div>
 
                         <!-- Painel de Ações Inteligentes rápidas -->
                         <?php if($ag['status'] === 'agendado'): ?>
                             <div class="d-flex gap-2 mt-3 pt-3 border-top border-secondary" style="--bs-border-opacity: .2;" id="acoes-<?php echo $ag['id']; ?>">
+                                <!-- Procure o local dos botões de ação e substitua por este trio: -->
                                 <button class="btn btn-success btn-action flex-grow-1 btn-mudar-status" data-id="<?php echo $ag['id']; ?>" data-status="concluido">
                                     <i class="fa-solid fa-check me-1"></i> Concluir
                                 </button>
-                                <button class="btn btn-outline-danger btn-action btn-mudar-status" data-id="<?php echo $ag['id']; ?>" data-status="nao_compareceu">
-                                    <i class="fa-solid fa-user-slash"></i> Faltou
+                                <button class="btn btn-outline-danger btn-action btn-mudar-status" data-id="<?php echo $ag['id']; ?>" data-status="nao_compareceu" title="Faltou">
+                                    <i class="fa-solid fa-user-slash"></i>
+                                </button>
+                                <!-- NOVO BOTÃO REAGENDAR -->
+                                <button class="btn btn-outline-warning btn-action btn-abrir-reagendar" data-id="<?php echo $ag['id']; ?>" data-servicoid="<?php echo $ag['servico_id']; ?>" title="Mudar Horário">
+                                    <i class="fa-regular fa-calendar-plus"></i>
+                                </button>
+                                <button class="btn btn-dark border-secondary btn-action text-danger btn-mudar-status" data-id="<?php echo $ag['id']; ?>" data-status="cancelado" title="Cancelar Horário">
+                                    <i class="fa-solid fa-trash-can"></i>
                                 </button>
                             </div>
                         <?php endif; ?>
@@ -204,6 +213,34 @@ foreach ($agendamentos_hoje as $ag) {
                 <?php endforeach; ?>
             <?php endif; ?>
         </div>
+        
+        <!-- Modal de Reagendamento -->
+        <div class="modal fade" id="modalReagendar" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered mx-auto px-3" style="max-width: 400px;">
+                <div class="modal-content modal-custom p-3" style="background-color: var(--bg-card); border: 1px solid var(--border-color); color: white; border-radius: 20px;">
+                    <div class="modal-header border-0 p-0 mb-3">
+                        <h5 class="modal-title fw-bold text-warning"><i class="fa-regular fa-calendar-days me-2"></i>Alterar Horário</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <input type="hidden" id="reagendar-id">
+                    <input type="hidden" id="reagendar-servicoid">
+                    
+                    <div class="mb-3">
+                        <label class="form-label small text-secondary fw-semibold">Selecione a Nova Data</label>
+                        <input type="date" id="reagendar-data" class="form-control input-custom" value="<?php echo date('Y-m-d'); ?>" min="<?php echo date('Y-m-d'); ?>" style="background-color: var(--bg-main) !important; border: 1px solid var(--border-color) !important; color: white !important; border-radius: 10px;">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label small text-secondary fw-semibold">Horários Disponíveis</label>
+                        <div id="reagendar-container-horarios" class="grid grid-cols-4 gap-2 d-flex flex-wrap">
+                            <!-- Injetado via AJAX -->
+                        </div>
+                    </div>
+                    <button id="btn-confirmar-reagendamento" class="btn btn-warning w-100 py-2 fw-bold text-dark rounded-3 shadow mt-2">Confirmar Novo Horário</button>
+                </div>
+            </div>
+        </div>
+
 
     </main>
 
@@ -256,6 +293,138 @@ foreach ($agendamentos_hoje as $ag) {
                 });
             });
         });
+
+        // --- LÓGICA DE REAGENDAMENTO (AJAX) ---
+        const modalReagendarEl = new bootstrap.Modal(document.getElementById('modalReagendar'));
+        const campoReagendarId = document.getElementById('reagendar-id');
+        const campoReagendarServicoId = document.getElementById('reagendar-servicoid');
+        const campoReagendarData = document.getElementById('reagendar-data');
+        const containerReagendarHorarios = document.getElementById('reagendar-container-horarios');
+        const btnConfirmarReagendamento = document.getElementById('btn-confirmar-reagendamento');
+        let horarioSelecionadoFinal = '';
+
+        // Captura cliques nos botões de abrir o modal
+        document.querySelectorAll('.btn-abrir-reagendar').forEach(btn => {
+            btn.addEventListener('click', function() {
+                campoReagendarId.value = this.dataset.id;
+                campoReagendarServicoId.value = this.dataset.servicoid;
+                modalReagendarEl.show();
+                buscarHorariosReagendamento();
+            });
+        });
+
+        // Atualiza horários se mudar a data no modal
+        campoReagendarData.addEventListener('change', buscarHorariosReagendamento);
+
+        function buscarHorariosReagendamento() {
+            const agendamentoId = campoReagendarId.value;
+            const servicoId = campoReagendarServicoId.value;
+            const dataSel = campoReagendarData.value;
+            
+            // Captura o ID da barbearia direto do seu escopo PHP com segurança
+            const bId = "<?php echo $barbearia_id; ?>";
+
+            // Mostra o carregando centralizado dentro do container
+            containerReagendarHorarios.innerHTML = '<p class="text-xs text-muted py-2 w-100 text-center"><i class="fa-solid fa-spinner animate-spin me-1"></i> Buscando vagas...</p>';
+            horarioSelecionadoFinal = '';
+
+            // URL montada de forma limpa sem escapes que quebram o interpretador
+            const urlApi = '/agenda/api/horarios_disponiveis.php?barbearia_id=' + bId + '&data=' + dataSel + '&servico_id=' + servicoId;
+
+            fetch(urlApi)
+                .then(r => {
+                    if (!r.ok) throw new Error('Falha na resposta do servidor');
+                    return r.json();
+                })
+                .then(dados => {
+                    containerReagendarHorarios.innerHTML = '';
+                    
+                    if (dados.erro || !dados.horarios || dados.horarios.length === 0) {
+                        containerReagendarHorarios.innerHTML = '<p class="text-xs text-danger py-2 w-100 text-center fw-bold">Sem horários livres para este dia.</p>';
+                        return;
+                    }
+
+                    // Renderiza os botões de horário usando a estilização do Bootstrap 5 homologada
+                    dados.horarios.forEach(horario => {
+                        const b = document.createElement('button');
+                        b.type = 'button';
+                        // Classe utilitária d-inline-block adicionada para forçar o alinhamento
+                        b.className = 'btn btn-outline-light btn-sm font-bold m-1 btn-slot-reagendar d-inline-block';
+                        b.textContent = horario;
+                        b.style.fontSize = '0.75rem';
+                        b.style.padding = '6px 10px';
+                        
+                        b.addEventListener('click', function() {
+                            document.querySelectorAll('.btn-slot-reagendar').forEach(btnDom => {
+                                btnDom.classList.remove('btn-warning', 'text-dark');
+                                btnDom.classList.add('btn-outline-light');
+                            });
+                            b.classList.remove('btn-outline-light');
+                            b.classList.add('btn-warning', 'text-dark');
+                            horarioSelecionadoFinal = horario;
+                        });
+                        containerReagendarHorarios.appendChild(b);
+                    });
+                })
+                .catch(err => {
+                    console.error('Erro no fetch de reagendamento:', err);
+                    containerReagendarHorarios.innerHTML = '<p class="text-xs text-danger py-2 w-100 text-center">Erro ao processar horários.</p>';
+                });
+        }
+
+
+        // Dispara o salvamento do novo horário
+        // --- CORREÇÃO DO CLIQUE FINAL DE CONFIRMAÇÃO ---
+        btnConfirmarReagendamento.addEventListener('click', function() {
+            // Busca na tela o botão de horário que está dourado (ativo/marcado pelo usuário)
+            const botaoAtivo = document.querySelector('.btn-slot-reagendar.btn-warning');
+            
+            if (!botaoAtivo) {
+                alert('Por favor, selecione um horário disponível da lista antes de confirmar.');
+                return;
+            }
+
+            const horarioParaGravar = botaoAtivo.textContent.trim();
+            const agendamentoId = campoReagendarId.value;
+            const dataDestino = campoReagendarData.value;
+
+            // Desabilita o botão para evitar cliques duplos acidentais
+            btnConfirmarReagendamento.disabled = true;
+            btnConfirmarReagendamento.textContent = 'Processando...';
+
+            // Dispara a requisição POST via AJAX para o Droplet
+            fetch('/agenda/api/reagendar.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: agendamentoId,
+                    data: dataDestino,
+                    horario: horarioParaGravar
+                })
+            })
+            .then(r => {
+                if (!r.ok) throw new Error('API retornou status de erro');
+                return r.json();
+            })
+            .then(res => {
+                if (res.sucesso) {
+                    // Recarrega o dashboard com o cliente movido com sucesso para o novo dia/hora
+                    window.location.reload();
+                } else {
+                    alert('Erro no Servidor: ' + res.erro);
+                    btnConfirmarReagendamento.disabled = false;
+                    btnConfirmarReagendamento.textContent = 'Confirmar Novo Horário';
+                }
+            })
+            .catch(err => {
+                console.error('Erro ao reagendar:', err);
+                alert('Erro de comunicação. Verifique se o arquivo api/reagendar.php foi enviado para a nuvem.');
+                btnConfirmarReagendamento.disabled = false;
+                btnConfirmarReagendamento.textContent = 'Confirmar Novo Horário';
+            });
+        });
+
+
     </script>
 
 </body>

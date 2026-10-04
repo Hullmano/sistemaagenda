@@ -17,7 +17,7 @@ $agendamento_id = isset($dados['id']) ? (int)$dados['id'] : 0;
 $novo_status    = isset($dados['status']) ? trim($dados['status']) : '';
 
 // Permite apenas os status válidos conforme mapeamos no banco
-$status_permitidos = ['concluido', 'nao_compareceu'];
+$status_permitidos = ['concluido', 'nao_compareceu', 'cancelado'];
 
 if ($agendamento_id <= 0 || !in_array($novo_status, $status_permitidos)) {
     http_response_code(400);
