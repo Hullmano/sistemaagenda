@@ -1,8 +1,12 @@
 <?php
 // views/admin_painel.php
-$db = \Database::getConnection();
-$data_hoje = date('Y-m-d');
 
+$db = \Database::getConnection();
+
+// 1. CAPTURA A DATA DINÂMICA: Se vier via URL (?data=2026-10-07) usa ela, senão usa HOJE
+$data_selecionada = isset($_GET['data']) ? trim($_GET['data']) : date('Y-m-d');
+
+// 2. Consulta agendamentos filtrando pela DATA SELECIONADA na barbearia conectada
 $stmt = $db->prepare("
     SELECT a.id, a.servico_id, a.horario_inicio, c.nome AS cliente_nome, c.whatsapp AS cliente_whats, s.nome AS servico_nome, s.preco, a.status 
     FROM agendamentos a
@@ -11,9 +15,10 @@ $stmt = $db->prepare("
     WHERE a.barbearia_id = ? AND a.data_agendamento = ?
     ORDER BY a.horario_inicio ASC
 ");
-$stmt->execute([$barbearia_id, $data_hoje]);
+$stmt->execute([$barbearia_id, $data_selecionada]);
 $agendamentos_hoje = $stmt->fetchAll();
 
+// 3. Cálculos de faturamento baseados no dia selecionado
 $total_cortes = count($agendamentos_hoje);
 $faturamento_previsto = 0;
 foreach ($agendamentos_hoje as $ag) {
@@ -22,6 +27,7 @@ foreach ($agendamentos_hoje as $ag) {
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -29,13 +35,9 @@ foreach ($agendamentos_hoje as $ag) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel Admin - <?php echo htmlspecialchars($barbearia_nome); ?></title>
     <!-- Bootstrap 5 CSS CDN -->
-    <!-- Copie e cole este bloco no <head> das 3 views administrativas -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://googleapis.com" rel="stylesheet">
-    <!--link href="https://cloudflare.com" rel="stylesheet"--> 
-    <script src="https://cloudflare.com" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
-    
     <style>
         :root {
             --bg-main: #0B0F19;
@@ -112,23 +114,25 @@ foreach ($agendamentos_hoje as $ag) {
     <!-- Container Otimizado para o Celular do Barbeiro -->
     <main class="container py-4" style="max-width: 480px;">
         
-        <!-- Cabeçalho Dinâmico -->
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-                <h4 class="fw-bold m-0" style="letter-spacing: -0.5px;">Fluxo de Hoje</h4>
-                <p class="text-muted small m-0"><i class="fa-regular fa-calendar me-1"></i><?php echo date('d/m/Y'); ?></p>
-            </div>
-            <div class="d-flex gap-2">
-                <!-- LINK PARA OS SERVIÇOS -->
-                <a href="/agenda/<?php echo $slug_filtrado; ?>/admin/servicos" class="btn btn-sm btn-dark border-secondary text-warning rounded-3 px-3 py-2 text-decoration-none d-flex align-items-center">
-                    <i class="fa-solid fa-tags me-1"></i> Serviços
-                </a>
-                <button class="btn btn-sm btn-dark border-secondary text-white rounded-3 px-3 py-2" onclick="window.location.reload();">
-                    <i class="fa-solid fa-arrows-rotate"></i>
-                </button>
-                <a href="/agenda/<?php echo $slug_filtrado; ?>/admin/horarios" class="btn btn-sm btn-dark border-secondary text-warning rounded-3 px-3 py-2 text-decoration-none d-flex align-items-center">
-                    <i class="fa-solid fa-clock me-1"></i> Horários
-                </a>
+        <!-- Cabeçalho Dinâmico Com Navegação de Datas -->
+        <div class="card p-3 mb-4 shadow-sm border border-secondary" style="background-color: var(--bg-card); --bs-border-opacity: .15; border-radius: 16px;">
+            <div class="row g-2 align-items-center">
+                <div class="col-7">
+                    <label class="text-secondary fw-bold text-uppercase d-block mb-1" style="font-size: 0.65rem; letter-spacing: 0.5px;">Visualizar Data</label>
+                    <!-- O id="filtro-data-painel" é monitorado pelo JavaScript abaixo -->
+                    <input type="date" id="filtro-data-painel" class="form-control input-custom py-2 fw-bold text-warning" value="<?php echo $data_selecionada; ?>" style="background-color: var(--bg-main) !important; border: 1px solid var(--border-color) !important; color: #FF9F43 !important; border-radius: 10px; font-size: 0.9rem;">
+                </div>
+                <div class="col-5 d-flex justify-content-end gap-1 mt-auto">
+                    <a href="/agenda/<?php echo $slug_filtrado; ?>/admin/servicos" class="btn btn-sm btn-dark border-secondary text-white rounded-3 p-2 text-decoration-none d-flex align-items-center" title="Catálogo de Serviços">
+                        <i class="fa-solid fa-tags"></i>
+                    </a>
+                    <a href="/agenda/<?php echo $slug_filtrado; ?>/admin/horarios" class="btn btn-sm btn-dark border-secondary text-white rounded-3 p-2 text-decoration-none d-flex align-items-center" title="Horários de Trabalho">
+                        <i class="fa-solid fa-clock"></i>
+                    </a>
+                    <button class="btn btn-sm btn-dark border-secondary text-white rounded-3 p-2" onclick="window.location.reload();" title="Atualizar Lista">
+                        <i class="fa-solid fa-arrows-rotate"></i>
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -247,6 +251,15 @@ foreach ($agendamentos_hoje as $ag) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0"></script>
 
     <script>
+        // --- SCRIPT DE NAVEGAÇÃO DE DATAS NO PAINEL ---
+        const filtroDataPainel = document.getElementById('filtro-data-painel');
+        filtroDataPainel.addEventListener('change', function() {
+            const dataEscolhida = this.value;
+            // Redireciona a página passando a nova data na URL via GET
+            window.location.href = '?data=' + dataEscolhida;
+        });
+
+
         document.addEventListener("DOMContentLoaded", function() {
             // Escuta cliques em qualquer botão que possua a classe de mudança de status [1]
             document.querySelectorAll('.btn-mudar-status').forEach(botao => {
@@ -254,7 +267,17 @@ foreach ($agendamentos_hoje as $ag) {
                     const agendamentoId = this.dataset.id;
                     const novoStatus = this.dataset.status;
 
-                    if (!confirm(`Deseja alterar o status para ${novoStatus === 'concluido' ? 'Concluído' : 'Faltou'}?`)) {
+                    // Dicionário de tradução sênior para exibir o texto exato na tela
+                    const textosStatus = {
+                        'concluido': 'Concluído',
+                        'nao_compareceu': 'Faltou',
+                        'cancelado': 'Cancelado'
+                    };
+
+                    const statusTraduzido = textosStatus[novoStatus] || novoStatus;
+
+                    // Mensagem dinâmica e precisa baseada no botão clicado
+                    if (!confirm(`Deseja realmente alterar o status deste agendamento para: ${statusTraduzido}?`)) {
                         return;
                     }
 

@@ -1,8 +1,9 @@
 <?php
 // views/cliente_agendamento.php
-// Busca os serviços reais da barbearia para listar no Passo 1
+
+// 1. Busca os serviços reais da barbearia para listar no Passo 1
 $db = \Database::getConnection();
-$stmt = $db->prepare("SELECT id, nome, preco, duracao_minutos FROM servicos WHERE barbearia_id = ? AND ativo = 1");
+$stmt = $db->prepare("SELECT id, nome, preco, duracao_minutos FROM servicos WHERE barbearia_id = ? AND ativo = 1 ORDER BY nome ASC");
 $stmt->execute([$barbearia_id]);
 $servicos_reais = $stmt->fetchAll();
 ?>
@@ -12,208 +13,220 @@ $servicos_reais = $stmt->fetchAll();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Agendamento - <?php echo htmlspecialchars($barbearia_nome); ?></title>
+    
+    <!-- Links Estáveis via CDN (cdnjs) -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-</head>
-<body class="bg-base-300 min-h-screen font-sans antialiased text-base-content pb-10">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
-    <header class="bg-base-100 shadow-lg sticky top-0 z-50 px-4 py-4 border-b border-base-200">
-        <div class="max-w-md mx-auto flex items-center justify-between">
+
+    <style>
+        :root {
+            --bg-main: #0B0F19;
+            --bg-card: #151B2C;
+            --border-color: #222B45;
+            --text-primary: #F4F6F9;
+            --text-secondary: #8F9BB3;
+            --accent: #FF9F43;
+        }
+        body { 
+            background-color: var(--bg-main); 
+            color: var(--text-primary);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        .header-custom { background-color: var(--bg-card); border-bottom: 1px solid var(--border-color); }
+        .card-custom { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; }
+        .input-custom { background-color: var(--bg-main) !important; border: 1px solid var(--border-color) !important; color: white !important; border-radius: 10px; }
+        .btn-horario { font-weight: bold; font-size: 0.75rem; padding: 8px; border-radius: 8px; }
+    </style>
+</head>
+<body class="pb-5">
+
+    <!-- Header da Barbearia -->
+    <header class="header-custom sticky-top py-3 px-3 shadow-lg">
+        <div class="max-w-md mx-auto d-flex justify-content-between align-items-center" style="max-width: 450px;">
             <div>
-                <h1 class="text-xl font-bold tracking-tight text-primary"><?php echo htmlspecialchars($barbearia_nome); ?></h1>
-                <p class="text-xs text-base-content/60">Agendamento Online Mobile</p>
+                <h5 class="m-0 fw-bold text-warning"><?php echo htmlspecialchars($barbearia_nome); ?></h5>
+                <small class="text-secondary text-xs">Agendamento Online Mobile</small>
             </div>
-            <div class="badge badge-success gap-1 text-xs py-2 font-semibold">
-                <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span> Aberto
-            </div>
+            <span class="badge bg-success-subtle text-success px-2 py-1 rounded-pill fw-bold text-uppercase" style="font-size: 0.65rem;">Aberto</span>
         </div>
     </header>
 
-    <!-- Guardamos o ID da barbearia em um campo oculto para o JavaScript ler -->
+    <!-- ID Oculto para o JavaScript ler -->
     <input type="hidden" id="barbearia_id" value="<?php echo $barbearia_id; ?>">
 
-    <main class="max-w-md mx-auto p-4 space-y-6">
+    <!-- Container Otimizado para Celular -->
+    <main class="container py-4" style="max-width: 450px;">
+        <div class="d-flex flex-column gap-3">
 
-        <!-- PASSO 1: Escolha do Serviço Dinâmico -->
-        <section class="card bg-base-100 shadow-xl">
-            <div class="card-body p-4">
-                <div class="flex items-center gap-2 mb-3">
-                    <span class="badge badge-primary font-bold">1</span>
-                    <h2 class="card-title text-base font-bold">Selecione o Serviço</h2>
+            <!-- PASSO 1: Escolha do Serviço -->
+            <div class="card-custom p-3 shadow-sm">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <span class="badge bg-warning text-dark fw-bold">1</span>
+                    <h6 class="m-0 fw-bold text-white">Selecione o Serviço</h6>
                 </div>
                 
-                <div class="space-y-3">
+                <div class="d-flex flex-column gap-2">
                     <?php if(empty($servicos_reais)): ?>
-                        <p class="text-sm text-error">Nenhum serviço cadastrado.</p>
+                        <p class="text-sm text-danger m-0">Nenhum serviço cadastrado nesta barbearia.</p>
                     <?php else: ?>
                         <?php foreach($servicos_reais as $index => $servico): ?>
-                            <label class="label cursor-pointer p-3 rounded-xl border border-base-200 bg-base-200/50 hover:bg-base-200 transition-all flex justify-between items-center">
-                                <div class="flex items-center gap-3">
-                                    <input type="radio" name="servico" value="<?php echo $servico['id']; ?>" class="radio radio-primary seletor-servico" <?php echo $index === 0 ? 'checked' : ''; ?> />
+                            <label class="d-flex justify-content-between align-items-center p-3 border border-secondary rounded-3" style="--bs-border-opacity: .15; cursor: pointer; background: rgba(255,255,255,0.02);">
+                                <div class="d-flex align-items-center gap-3">
+                                    <input type="radio" name="servico" value="<?php echo $servico['id']; ?>" class="form-check-input seletor-servico m-0" <?php echo $index === 0 ? 'checked' : ''; ?>>
                                     <div>
-                                        <span class="font-bold text-sm block"><?php echo htmlspecialchars($servico['nome']); ?></span>
-                                        <span class="text-xs text-base-content/60">⏱️ <?php echo $servico['duracao_minutos']; ?> min</span>
+                                        <span class="fw-bold text-white text-sm d-block"><?php echo htmlspecialchars($servico['nome']); ?></span>
+                                        <small class="text-secondary">⏱️ <?php echo $servico['duracao_minutos']; ?> min</small>
                                     </div>
                                 </div>
-                                <span class="font-extrabold text-sm text-primary">R\$<?php echo number_format($servico['preco'], 2, ',', '.'); ?></span>
+                                <span class="fw-extrabold text-warning small">R$ <?php echo number_format($servico['preco'], 2, ',', '.'); ?></span>
                             </label>
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
             </div>
-        </section>
-
-        <!-- PASSO 2: Escolha da Data -->
-        <section class="card bg-base-100 shadow-xl">
-            <div class="card-body p-4">
-                <div class="flex items-center gap-2 mb-3">
-                    <span class="badge badge-primary font-bold">2</span>
-                    <h2 class="card-title text-base font-bold">Escolha o Dia</h2>
+            <!-- PASSO 2: Escolha da Data -->
+            <div class="card-custom p-3 shadow-sm">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <span class="badge bg-warning text-dark fw-bold">2</span>
+                    <h6 class="m-0 fw-bold text-white">Escolha o Dia</h6>
                 </div>
-                <input type="date" id="campo-data" class="input input-bordered w-full font-medium" value="<?php echo date('Y-m-d'); ?>" min="<?php echo date('Y-m-d'); ?>" />
+                <input type="date" id="campo-data" class="form-control input-custom" value="<?php echo date('Y-m-d'); ?>" min="<?php echo date('Y-m-d'); ?>">
             </div>
-        </section>
 
-        <!-- PASSO 3: Horários Disponíveis Gerados via AJAX -->
-        <section class="card bg-base-100 shadow-xl">
-            <div class="card-body p-4">
-                <div class="flex items-center gap-2 mb-3">
-                    <span class="badge badge-primary font-bold">3</span>
-                    <h2 class="card-title text-base font-bold">Horários Disponíveis</h2>
+            <!-- PASSO 3: Horários Livres -->
+            <div class="card-custom p-3 shadow-sm">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <span class="badge bg-warning text-dark fw-bold">3</span>
+                    <h6 class="m-0 fw-bold text-white">Horários Disponíveis</h6>
                 </div>
-                
-                <!-- O JavaScript vai injetar os botões de horários reais dentro desta div -->
-                <div id="container-horarios" class="grid grid-cols-4 gap-2">
-                    <p class="text-xs text-base-content/50 col-span-4 text-center py-2">Carregando horários...</p>
+                <div id="container-horarios" class="row row-cols-4 g-2 px-2">
+                    <p class="text-xs text-secondary text-center w-100 py-2 m-0">Buscando horários...</p>
                 </div>
             </div>
-        </section>
 
-        <!-- PASSO 4: Identificação do Cliente -->
-        <section class="card bg-base-100 shadow-xl">
-            <div class="card-body p-4">
-                <div class="flex items-center gap-2 mb-3">
-                    <span class="badge badge-primary font-bold">4</span>
-                    <h2 class="card-title text-base font-bold">Seus Dados</h2>
+            <!-- PASSO 4: Identificação do Cliente -->
+            <div class="card-custom p-3 shadow-sm">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <span class="badge bg-warning text-dark fw-bold">4</span>
+                    <h6 class="m-0 fw-bold text-white">Seus Dados</h6>
                 </div>
-                <div class="space-y-3">
-                    <input type="text" id="cliente-nome" placeholder="Seu Nome Completo" class="input input-bordered w-full text-sm" required   />
-                    <input type="tel" id="cliente-whatsapp" placeholder="WhatsApp com DDD (Ex: 62999999999)" class="input input-bordered w-full text-sm" required />
+                <div class="d-flex flex-column gap-2">
+                    <input type="text" id="cliente-nome" placeholder="Seu Nome Completo" class="form-control input-custom" required>
+                    <input type="tel" id="cliente-whatsapp" placeholder="WhatsApp com DDD (Ex: 62999999999)" class="form-control input-custom" required>
                 </div>
             </div>
-        </section>
 
-        <div class="pt-2">
-            <button id="btn-finalizar" class="btn btn-primary btn-block shadow-lg text-base font-bold tracking-wide uppercase py-3 h-auto">
-                ⚡ Confirmar Agendamento
-            </button>
+            <!-- Botão Confirmar -->
+            <div class="pt-2">
+                <button id="btn-finalizar" class="btn btn-warning w-100 py-3 fw-bold text-dark text-uppercase shadow shadow-lg" style="border-radius: 12px; letter-spacing: 0.5px;">
+                    ⚡ Confirmar Agendamento
+                </button>
+            </div>
+
         </div>
     </main>
 
-    <!-- SCRIPT AJAX COM FETCH API -->
+    <!-- Bootstrap 5 JavaScript via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0"></script>
+
+    <!-- Motor AJAX Otimizado para a subpasta /agenda -->
     <script>
     document.addEventListener("DOMContentLoaded", function() {
         const campoData = document.getElementById('campo-data');
         const containerHorarios = document.getElementById('container-horarios');
         const barbeariaId = document.getElementById('barbearia_id').value;
+        const btnFinalizar = document.getElementById('btn-finalizar');
+        const campoNome = document.getElementById('cliente-nome');
+        const campoWhats = document.getElementById('cliente-whatsapp');
+        let horarioSelecionado = '';
 
-        // Função responsável por buscar os horários na API via AJAX
         function carregarHorarios() {
             const dataSelecionada = campoData.value;
             const servicoSelecionado = document.querySelector('input[name="servico"]:checked')?.value;
 
             if (!dataSelecionada || !servicoSelecionado) return;
 
-            containerHorarios.innerHTML = '<p class="text-xs text-base-content/50 col-span-4 text-center py-2">Buscando vagas...</p>';
+            containerHorarios.innerHTML = '<p class="text-xs text-muted text-center w-100 py-2 m-0"><i class="fa-solid fa-spinner fa-spin me-1"></i> Procurando vagas...</p>';
+            horarioSelecionado = '';
 
-            // Faz a requisição em segundo plano para nossa API PHP
-            fetch(`api/horarios_disponiveis.php?barbearia_id=${barbeariaId}&data=${dataSelecionada}&servico_id=${servicoSelecionado}`)
-                .then(response => response.json())
+            fetch('/agenda/api/horarios_disponiveis.php?barbearia_id=' + barbeariaId + '&data=' + dataSelecionada + '&servico_id=' + servicoSelecionado)
+                .then(r => r.json())
                 .then(dados => {
-                    containerHorarios.innerHTML = ''; // Limpa o carregando
+                    containerHorarios.innerHTML = '';
 
                     if (dados.erro || !dados.horarios || dados.horarios.length === 0) {
-                        containerHorarios.innerHTML = '<p class="text-xs text-error col-span-4 text-center py-2 font-semibold">Nenhum horário livre para este dia.</p>';
+                        containerHorarios.innerHTML = '<p class="text-xs text-danger text-center w-100 py-2 m-0 fw-bold">Sem horários livres ou barbearia fechada neste dia.</p>';
                         return;
                     }
 
-                    // Cria um botão bonito em Tailwind/DaisyUI para cada horário retornado pelo algoritmo
                     dados.horarios.forEach(horario => {
-                        const botao = document.createElement('button');
-                        botao.type = 'button';
-                        botao.className = 'btn btn-outline btn-sm font-bold text-xs hover:btn-primary btn-horario';
-                        botao.textContent = horario;
+                        const col = document.createElement('div');
+                        col.className = 'col px-1';
                         
-                        // Evento de clique para marcar o botão como ativo
-                        botao.addEventListener('click', function() {
-                            document.querySelectorAll('.btn-horario').forEach(b => b.classList.remove('btn-primary', 'text-white'));
-                            botao.classList.add('btn-primary', 'text-white');
-                            botao.dataset.selecionado = "true";
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'btn btn-outline-light w-100 btn-horario btn-slot-cliente';
+                        btn.textContent = horario;
+                        
+                        btn.addEventListener('click', function() {
+                            document.querySelectorAll('.btn-slot-cliente').forEach(b => {
+                                b.classList.remove('btn-warning', 'text-dark');
+                                b.classList.add('btn-outline-light');
+                            });
+                            btn.classList.remove('btn-outline-light');
+                            btn.classList.add('btn-warning', 'text-dark');
+                            horarioSelecionado = horario;
                         });
 
-                        containerHorarios.appendChild(botao);
+                        col.appendChild(btn);
+                        containerHorarios.appendChild(col);
                     });
                 })
-                .catch(erro => {
-                    console.error('Erro no AJAX:', erro);
-                    containerHorarios.innerHTML = '<p class="text-xs text-error col-span-4 text-center py-2">Erro ao carregar agenda.</p>';
+                .catch(err => {
+                    console.error(err);
+                    containerHorarios.innerHTML = '<p class="text-xs text-danger text-center w-100 py-2 m-0">Erro ao processar horários.</p>';
                 });
         }
 
-        // --- CÓDIGO DE ENVIO DO AGENDAMENTO ---
-        const btnFinalizar = document.getElementById('btn-finalizar');
-        const campoNome = document.getElementById('cliente-nome');
-        const campoWhats = document.getElementById('cliente-whatsapp');
+        campoData.addEventListener('change', carregarHorarios);
+        document.querySelectorAll('.seletor-servico').forEach(radio => {
+            radio.addEventListener('change', carregarHorarios);
+        });
 
+        // Evento de Gravação do Agendamento Final do Cliente
         btnFinalizar.addEventListener('click', function() {
-            // Captura o botão de horário que está marcado com a classe do DaisyUI 'btn-primary'
-            const botaoHorarioSelecionado = document.querySelector('.btn-horario.btn-primary');
             const servicoSelecionado = document.querySelector('input[name="servico"]:checked')?.value;
 
-            if (!servicoSelecionado) {
-                alert('Por favor, selecione um serviço.');
-                return;
-            }
-            if (!botaoHorarioSelecionado) {
-                alert('Por favor, escolha um horário disponível da lista.');
-                return;
-            }
-            if (!campoNome.value.trim() || !campoWhats.value.trim()) {
-                alert('Por favor, preencha seu nome e seu WhatsApp.');
-                return;
-            }
+            if (!servicoSelecionado) { alert('Por favor, selecione um serviço.'); return; }
+            if (!horarioSelecionado) { alert('Por favor, escolha um horário disponível da lista.'); return; }
+            if (!campoNome.value.trim() || !campoWhats.value.trim()) { alert('Por favor, preencha seu nome e seu WhatsApp com DDD.'); return; }
 
-            // Desabilita o botão para o cliente não clicar duas vezes por ansiedade
             btnFinalizar.disabled = true;
-            btnFinalizar.textContent = 'Processando...';
+            btnFinalizar.textContent = 'Processando reserva...';
 
-            // Monta o payload de dados
-            const dadosAgendamento = {
-                barbearia_id: barbeariaId,
-                servico_id: servicoSelecionado,
-                data: campoData.value,
-                horario: botaoHorarioSelecionado.textContent,
-                nome: campoNome.value,
-                whatsapp: campoWhats.value
-            };
-
-            // Dispara a requisição POST via AJAX
-            fetch('api/criar_agendamento.php', {
+            fetch('/agenda/api/criar_agendamento.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(dadosAgendamento)
+                body: JSON.stringify({
+                    barbearia_id: barbeariaId,
+                    servico_id: servicoSelecionado,
+                    data: campoData.value,
+                    horario: horarioSelecionado,
+                    nome: campoNome.value,
+                    whatsapp: campoWhats.value
+                })
             })
-            .then(response => response.json())
+            .then(r => r.json())
             .then(res => {
                 if (res.sucesso) {
-                    // Substitui o conteúdo por uma mensagem elegante de sucesso
                     document.querySelector('main').innerHTML = `
-                        <div class="card bg-base-100 shadow-xl text-center p-6 space-y-4 animate-bounce">
-                            <div class="text-6xl">🎉</div>
-                            <h2 class="text-2xl font-black text-success">Agendado!</h2>
-                            <p class="text-sm text-base-content/80">Tudo certo, <strong>${campoNome.value}</strong>! Seu horário para o dia ${campoData.value} às ${botaoHorarioSelecionado.textContent} foi reservado.</p>
-                            <div class="alert alert-info text-xs font-semibold py-2">
-                                📱 Um lembrete será enviado no seu WhatsApp 1h antes do atendimento.
+                        <div class="card-custom text-center p-5 space-y-4 shadow shadow-lg border border-success" style="--bs-border-opacity: .3;">
+                            <div class="text-success mb-3" style="font-size: 4rem;"><i class="fa-solid fa-circle-check animate-pulse"></i></div>
+                            <h4 class="fw-extrabold text-success">Agendado com Sucesso!</h4>
+                            <p class="text-white-50 text-sm">Tudo certo, <strong>${campoNome.value}</strong>! Seu horário foi reservado para o dia ${campoData.value} às ${horarioSelecionado}.</p>
+                            <div class="alert alert-warning text-xs font-semibold py-2 m-0 mt-3 border-0 bg-warning bg-opacity-10 text-warning" style="font-size: 0.75rem;">
+                                <i class="fa-brands fa-whatsapp me-1"></i> Um lembrete automático será enviado 1 hora antes do corte!
                             </div>
                         </div>
                     `;
@@ -223,24 +236,14 @@ $servicos_reais = $stmt->fetchAll();
                     btnFinalizar.textContent = '⚡ Confirmar Agendamento';
                 }
             })
-            .catch(erro => {
-                console.error(erro);
-                alert('Ocorreu um erro de comunicação com o servidor.');
+            .catch(err => {
+                console.error(err);
+                alert('Erro na comunicação com o servidor.');
                 btnFinalizar.disabled = false;
                 btnFinalizar.textContent = '⚡ Confirmar Agendamento';
             });
         });
 
-
-        // Fica ouvindo quando o usuário muda a data
-        campoData.addEventListener('change', carregarHorarios);
-
-        // Fica ouvindo quando o usuário troca o serviço de rádio button
-        document.querySelectorAll('.seletor-servico').forEach(radio => {
-            radio.addEventListener('change', carregarHorarios);
-        });
-
-        // Carrega os horários automaticamente na primeira abertura da tela
         carregarHorarios();
     });
     </script>

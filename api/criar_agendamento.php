@@ -31,7 +31,7 @@ if ($barbearia_id <= 0 || $servico_id <= 0 || empty($data_agendamento) || empty(
 
 // Limpa o WhatsApp para salvar apenas números (Padrão Evolution API)
 $whatsapp_limpo = preg_replace('/[^0-9]/', '', $whatsapp_cliente);
-if (strlen($whatsapp_limpo) < 10) {
+if (strlen($whatsapp_limpo) < 10) { // Validação mínima de 10 dígitos (DDD + número)
     http_response_code(400);
     echo json_encode(['erro' => 'Por favor, insira um número de WhatsApp válido com DDD.']);
     exit;
