@@ -1,5 +1,7 @@
 <?php
 // api/horarios_disponiveis.php
+// Força a API a ler o relógio de Brasília no AJAX
+date_default_timezone_set('America/Sao_Paulo');
 
 // 1. Configura o cabeçalho para responder no formato JSON
 header('Content-Type: application/json; charset=utf-8');

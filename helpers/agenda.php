@@ -1,5 +1,7 @@
 <?php
 // helpers/agenda.php
+// Força a API a ler o relógio de Brasília no AJAX
+date_default_timezone_set('America/Sao_Paulo');
 
 function obterHorariosLivres($db, $barbearia_id, $data_desejada, $duracao_servico_minutos) {
     // 1. Descobrir o dia da semana (0 = Domingo, 6 = Sábado)
@@ -44,23 +46,24 @@ function obterHorariosLivres($db, $barbearia_id, $data_desejada, $duracao_servic
     while ($atual < $fim_expediente) {
         
         // ----------------=====================================================
-        // TRAVA DE SEGURANÇA CORRIGIDA: Bloquear horários passados se for HOJE
+        // TRAVA DE SEGURANÇA COM MARGEM DE ANTECEDÊNCIA SE FOR HOJE
         // ----------------=====================================================
         if ($data_desejada === date('Y-m-d')) {
-            $hora_do_slot = date('H:i', $atual); // Transforma em texto. Ex: '08:00'
-            $hora_relogio_agora = date('H:i');   // Hora real do servidor. Ex: '16:45'
+            $hora_do_slot = date('H:i', $atual); // Ex: '17:00'
+            
+            // Calcula o horário limite adicionando 15 minutos de antecedência de segurança
+            // Se no relógio do servidor for 16:40, o cliente só agenda a partir de 16:55
+            $hora_relogio_com_margem = date('H:i', strtotime('+15 minutes')); 
 
-            // Se o horário do slot for menor ou igual à hora do relógio agora, ignora
-            if ($hora_do_slot <= $hora_relogio_agora) {
-                $atual += $intervalo; // Avança a grade de 30 em 30 min
-                continue; // Pula para o próximo slot
+            if ($hora_do_slot <= $hora_relogio_com_margem) {
+                $atual += $intervalo;
+                continue; // Pula o horário passado ou colado demais
             }
         }
         // ----------------=====================================================
 
         // Calcula o horário hipotético de término deste serviço
         $termino_servico = $atual + ($duracao_servico_minutos * 60);
-
 
 
         // Se o serviço ultrapassar o horário de fechamento da barbearia, encerra o loop
@@ -106,7 +109,7 @@ function obterHorariosLivres($db, $barbearia_id, $data_desejada, $duracao_servic
         // Se passar por todas as regras sem colidir, o horário está LIVRE!
         if (!$colidiu) {
             $horarios_disponiveis[] = date('H:i', $atual);
-        }
+        } 
 
         // Avança para o próximo bloco de tempo da grade
         $atual += $intervalo;
