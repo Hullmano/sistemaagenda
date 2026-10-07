@@ -1,77 +1,90 @@
 <?php
 // views/admin_whatsapp.php
 
-// Configurações da sua Evolution API rodando no Docker do Droplet
-$api_url_base = "http://127.0.0.1:8080";
-$api_key_global = "mY@pikey"; // A senha secreta configurada no Docker
-$instancia_nome = $slug_filtrado; // O próprio slug da barbearia vira o nome da instância
-
+// 1. BLINDAGEM CONTRA ERRO 500: Define valores padrão caso o ambiente falhe
 $status_conexao = "DESCONECTADO";
 $qrcode_imagem = "";
+$http_code = 0;
 
-// 1. CHECAGEM SÊNIOR: Verifica se a instância já existe e está conectada (Rota corrigida para v2)
-$ch = curl_init("$api_url_base/instance/connectionStatus/$instancia_nome");
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-// ADICIONADO: Envio dos dois headers para garantir compatibilidade total na v2
-curl_setopt($ch, CURLOPT_HTTPHEADER, [
-    "X-API-Key: $api_key_global",
-    "apikey: $api_key_global"
-]);
-$response = curl_exec($ch);
-$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-curl_close($ch);
+// Configurações da sua Evolution API rodando no Docker do Droplet
+$api_url_base = "http://127.0.0.1:8080";
+$api_key_global = "mY@pik"; 
 
-if ($http_code === 200) {
-    $dados_instancia = json_decode($response, true);
-    // Ajustado para o padrão de retorno da v2 (compara se o status é 'open' ou 'connected')
-    $status_atual = $dados_instancia['status'] ?? $dados_instancia['connectionStatus'] ?? '';
-    if ($status_atual === 'open' || $status_atual === 'connected') {
-        $status_conexao = "CONECTADO";
-    }
-}
+// Garante que a variável do nome da instância existe para não dar erro fatal
+$instancia_nome = isset($slug_filtrado) ? $slug_filtrado : "barber_default"; 
 
-// 2. LÓGICA DE SOLICITAÇÃO DE QR CODE (Se o barbeiro clicar no botão)
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gerar_qr'])) {
-    
-    // Se a instância não existe (HTTP 404), manda criar automaticamente primeiro
-    if ($http_code === 404) {
-        $ch = curl_init("$api_url_base/instance/create");
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
-            "instanceName" => $instancia_nome,
-            "integration" => "WHATSAPP-BAILEYS", // ADICIONADO: Obrigatório na v2
-            "qrcode" => true
-        ]));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Content-Type: application/json", 
-            "X-API-Key: $api_key_global",
-            "apikey: $api_key_global"
-        ]);
-        curl_exec($ch);
-        curl_close($ch);
-    }
-
-    // Solicita o QR Code para a Evolution API
-    $ch = curl_init("$api_url_base/instance/connect/$instancia_nome");
+try {
+    // 2. CHECAGEM DE STATUS (Rota correta para v2)
+    $ch = curl_init("$api_url_base/instance/connectionStatus/$instancia_nome");
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 5); // Não deixa o PHP travar se a API demorar a responder
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         "X-API-Key: $api_key_global",
         "apikey: $api_key_global"
     ]);
-    $res_qr = curl_exec($ch);
+    $response = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    $dados_qr = json_decode($res_qr, true);
-    
-    // Captura o QR Code em formato Base64 (texto que vira imagem)
-    if (isset($dados_qr['base64'])) {
-        $qrcode_imagem = $dados_qr['base64'];
-    } elseif (isset($dados_qr['qrcode']['base64'])) { // Fallback para variação de nós da v2
-        $qrcode_imagem = $dados_qr['qrcode']['base64'];
+    if ($http_code === 200 && $response) {
+        $dados_instancia = json_decode($response, true);
+        $status_atual = $dados_instancia['status'] ?? $dados_instancia['connectionStatus'] ?? '';
+        if ($status_atual === 'open' || $status_atual === 'connected') {
+            $status_conexao = "CONECTADO";
+        }
     }
+
+    // 3. LÓGICA DE SOLICITAÇÃO DE QR CODE (Via clique do botão POST)
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gerar_qr'])) {
+        
+        // Se a instância não existe (404), manda criar automaticamente primeiro
+        if ($http_code === 404) {
+            $ch = curl_init("$api_url_base/instance/create");
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
+                "instanceName" => $instancia_nome,
+                "integration" => "WHATSAPP-BAILEYS",
+                "qrcode" => true
+            ]));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Content-Type: application/json", 
+                "X-API-Key: $api_key_global",
+                "apikey: $api_key_global"
+            ]);
+            curl_exec($ch);
+            curl_close($ch);
+        }
+
+        // Solicita o QR Code atualizado para renderizar na tela
+        $ch = curl_init("$api_url_base/instance/connect/$instancia_nome");
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "X-API-Key: $api_key_global",
+            "apikey: $api_key_global"
+        ]);
+        $res_qr = curl_exec($ch);
+        curl_close($ch);
+
+        if ($res_qr) {
+            $dados_qr = json_decode($res_qr, true);
+            
+            // Captura o QR Code tratando as variações de resposta da v2
+            if (isset($dados_qr['base64'])) {
+                $qrcode_imagem = $dados_qr['base64'];
+            } elseif (isset($dados_qr['qrcode']['base64'])) {
+                $qrcode_imagem = $dados_qr['qrcode']['base64'];
+            }
+        }
+    }
+} catch (Exception $e) {
+    // Evita o erro 500 registrando a falha silenciosamente caso o cURL falhe totalmente
+    error_log("Erro na integração do WhatsApp: " . $e->getMessage());
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
