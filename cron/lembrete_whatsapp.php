@@ -5,7 +5,7 @@
 // removemos o limite de tempo de execução por segurança
 set_time_limit(0);
 
-require_once '../db.php';
+require_once __DIR__ . '/../db.php';
 
 try {
     $db = \Database::getConnection();
