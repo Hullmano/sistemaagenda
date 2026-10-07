@@ -42,8 +42,22 @@ function obterHorariosLivres($db, $barbearia_id, $data_desejada, $duracao_servic
 
     // Loop para testar cada slot de horário do dia
     while ($atual < $fim_expediente) {
+        
+        // ----------------=====================================================
+        // TRAVA DE SEGURANÇA: Bloquear horários retroativos se for o dia de HOJE
+        // ----------------=====================================================
+        if ($data_desejada === date('Y-m-d')) {
+            // Se o horário do slot for menor ou igual ao horário atual do relógio, pula
+            if ($atual <= strtotime(date('H:i:s'))) {
+                $atual += $intervalo; // Avança a grade
+                continue; // Ignora o horário passado e vai para o próximo
+            }
+        }
+        // ----------------=====================================================
+
         // Calcula o horário hipotético de término deste serviço
         $termino_servico = $atual + ($duracao_servico_minutos * 60);
+
 
         // Se o serviço ultrapassar o horário de fechamento da barbearia, encerra o loop
         if ($termino_servico > $fim_expediente) {

@@ -1,5 +1,8 @@
 <?php
 // index.php
+// Garante que o relógio do sistema use o fuso horário oficial de Brasília
+date_default_timezone_set('America/Sao_Paulo');
+
 require_once 'db.php';
 
 // 1. Captura e limpa a URL enviada pelo .htaccess
