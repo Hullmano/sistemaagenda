@@ -132,6 +132,11 @@ foreach ($agendamentos_hoje as $ag) {
                     <button class="btn btn-sm btn-dark border-secondary text-white rounded-3 p-2" onclick="window.location.reload();" title="Atualizar Lista">
                         <i class="fa-solid fa-arrows-rotate"></i>
                     </button>
+
+                    <a href="/agenda/<?php echo $slug_filtrado; ?>/admin/whatsapp" class="btn btn-sm btn-dark border-secondary text-success rounded-3 p-2 text-decoration-none d-flex align-items-center" title="Configurar WhatsApp">
+                        <i class="fa-brands fa-whatsapp fs-6"></i>
+                    </a>
+
                 </div>
             </div>
         </div>

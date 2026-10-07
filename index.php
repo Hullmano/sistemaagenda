@@ -30,24 +30,33 @@ if ($barbearia) {
     
     // 4. VALIDAÇÃO DE ROTAS ADMINISTRATIVAS
     // Verifica se o segundo segmento existe e é estritamente 'admin'
+    // --- BLOCO CORRIGIDO DE ROTAS NO INDEX.PHP ---
+    // Verifica se o segundo segmento da URL existe e é estritamente 'admin'
+    // Ex: /agenda/barbearia_do_tiao/admin
     if (isset($partes[1]) && $partes[1] === 'admin') {
         
-        // Verifica se o terceiro segmento existe (Pode ser 'servicos' ou 'horarios')
-        $sub_acao = $partes[2] ?? '';
+        // Verifica o terceiro segmento da URL para carregar as sub-telas
+        $sub_acao = isset($partes[2]) ? $partes[2] : '';
         
         if ($sub_acao === 'servicos') {
+            // Ex: /agenda/barbearia_do_tiao/admin/servicos
             include 'views/admin_servicos.php';
         } elseif ($sub_acao === 'horarios') {
+            // Ex: /agenda/barbearia_do_tiao/admin/horarios
             include 'views/admin_horarios.php';
+        } elseif ($sub_acao === 'whatsapp') {
+            // Ex: /agenda/barbearia_do_tiao/admin/whatsapp
+            include 'views/admin_whatsapp.php';
         } else {
-            // Se for apenas slug/admin, abre o dashboard principal
+            // Se for apenas /admin, abre o dashboard principal
             include 'views/admin_painel.php';
         }
         
     } else {
-        // Se não houver 'admin' na URL, carrega a View de Agendamento do Cliente
+        // Se não houver 'admin' na URL, carrega a tela do Cliente
         include 'views/cliente_agendamento.php';
     }
+
 } else {
     http_response_code(404);
     echo "<h1>404 - Barbearia não encontrada</h1>";
