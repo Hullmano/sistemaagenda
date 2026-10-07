@@ -20,6 +20,8 @@ class Database {
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES   => false,
+                // LINEA DE OURO SÊNIOR: Força o MySQL a trabalhar no fuso de Brasília nesta conexão!
+                PDO::MYSQL_ATTR_INIT_COMMAND => "SET time_zone = '-03:00'"
             ];
 
             try {
