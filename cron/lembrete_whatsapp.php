@@ -1,6 +1,9 @@
 <?php
 // cron/lembrete_whatsapp.php
 
+// FORÇA O ROBÔ CLI A USAR O HORÁRIO DE BRASÍLIA
+date_default_timezone_set('America/Sao_Paulo');
+
 // Como o Cron roda direto na linha de comando (CLI) do Linux, 
 // removemos o limite de tempo de execução por segurança
 set_time_limit(0);
