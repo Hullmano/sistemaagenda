@@ -12,9 +12,9 @@ $status_conexao = "DESCONECTADO";
 $qrcode_imagem = "";
 $erro_sistema = "";
 
-// FUNÇÃO AUXILIAR: Verifica em tempo real o estado da conexão com o Docker
+// FUNÇÃO AUXILIAR CORRIGIDA PARA V2: Verifica o real estado no endpoint connectionState
 function checarStatusConexao($url, $instance, $key) {
-    $ch = curl_init("$url/instance/connectionStatus/$instance");
+    $ch = curl_init("$url/instance/connectionState/$instance");
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 3);
     curl_setopt($ch, CURLOPT_HTTPHEADER, ["X-API-Key: $key", "apikey: $key"]);
@@ -24,29 +24,31 @@ function checarStatusConexao($url, $instance, $key) {
 
     if ($http_code === 200 && $response) {
         $dados = json_decode($response, true);
-        $status = $dados['status'] ?? $dados['connectionStatus'] ?? '';
-        if ($status === 'open' || $status === 'connected') {
+        
+        // Na v2 o retorno de sucesso real traz ['instance']['state'] = 'open'
+        $estado_real = $dados['instance']['state'] ?? $dados['status'] ?? '';
+        if ($estado_real === 'open' || $estado_real === 'connected') {
             return "CONECTADO";
         }
     }
     return "DESCONECTADO";
 }
 
-// Inicializa a página checando se o robô já está ativo
+// Inicializa a página checando se o robô já está ativo no WhatsApp
 $status_conexao = checarStatusConexao($api_url_base, $instancia_nome, $api_key_global);
 
 // 2. PROCESSAMENTO DO BOTÃO "GERAR QR CODE DE CONEXÃO" (POST)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gerar_qr'])) {
     
-    // Verifica se a instância já existe antes de tentar criá-la
-    $ch = curl_init("$api_url_base/instance/connectionStatus/$instancia_nome");
+    // Verifica o status atual antes de tentar criar
+    $ch = curl_init("$api_url_base/instance/connectionState/$instancia_nome");
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, ["X-API-Key: $api_key_global", "apikey: $api_key_global"]);
     curl_exec($ch);
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    // Se a instância não existe (404), o PHP faz o cURL em background para criá-la no MySQL
+    // Se a instância não existe no Docker/MySQL (404), cria automaticamente em background
     if ($http_code === 404) {
         $ch = curl_init("$api_url_base/instance/create");
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -64,11 +66,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gerar_qr'])) {
         curl_exec($ch);
         curl_close($ch);
         
-        // Aguarda 2 segundos para o banco MySQL registrar a nova barbearia
+        // Aguarda 2 segundos para o banco MySQL processar as tabelas internas da nova barbearia
         sleep(2);
     }
 
-    // Solicita o QR Code em formato Base64 para a Evolution API
+    // Solicita o QR Code em formato Base64 para colar na tela
     $ch = curl_init("$api_url_base/instance/connect/$instancia_nome");
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, ["X-API-Key: $api_key_global", "apikey: $api_key_global"]);
@@ -77,11 +79,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gerar_qr'])) {
 
     if ($res_qr) {
         $dados_qr = json_decode($res_qr, true);
-        // Captura o Base64 mapeando as variações da v2
         $qrcode_imagem = $dados_qr['base64'] ?? $dados_qr['qrcode']['base64'] ?? "";
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
