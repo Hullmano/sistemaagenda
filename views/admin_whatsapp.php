@@ -79,7 +79,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gerar_qr'])) {
 
     if ($res_qr) {
         $dados_qr = json_decode($res_qr, true);
-        $qrcode_imagem = $dados_qr['base64'] ?? $dados_qr['qrcode']['base64'] ?? "";
+        // CORREÇÃO CIRÚRGICA V2.3.7: Captura o Base64 independente de como a API devolva
+        if (isset($dados_qr['base64'])) {
+            $qrcode_imagem = $dados_qr['base64'];
+        } elseif (isset($dados_qr['qrcode']['base64'])) {
+            $qrcode_imagem = $dados_qr['qrcode']['base64'];
+        } elseif (isset($dados_qr['code'])) {
+            // Caso a v2 devolva no formato limpo de string de imagem
+            $qrcode_imagem = $dados_qr['code'];
+        }
     }
 }
 ?>
