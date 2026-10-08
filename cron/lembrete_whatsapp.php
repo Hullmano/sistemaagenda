@@ -1,27 +1,28 @@
 <?php
 // cron/lembrete_whatsapp.php
-
-// FORÇA O ROBÔ CLI A USAR O HORÁRIO DE BRASÍLIA
 date_default_timezone_set('America/Sao_Paulo');
-
-// Como o Cron roda direto na linha de comando (CLI) do Linux, 
-// removemos o limite de tempo de execução por segurança
 set_time_limit(0);
 
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../helpers/agenda.php';
 
 try {
     $db = \Database::getConnection();
 
-    // 1. Definição da janela de tempo (Buscar agendamentos daqui a exatamente 1 hora)
-    // Se agora são 14:00, a janela buscará cortes agendados entre 14:50 e 15:00
+    // 1. Define a janela temporal cirúrgica de 1 hora para frente
     $data_hoje = date('Y-m-d');
-    $hora_inicio_janela = date('H:i:s', strtotime('+50 minutes')); 
+    $hora_inicio_janela = date('H:i:s', strtotime('+50 minutes'));
     $hora_fim_janela    = date('H:i:s', strtotime('+1 hour'));
 
-
+    // 2. Coleta agendamentos pendentes injetando o slug dinâmico da barbearia
     $stmt = $db->prepare("
-        SELECT a.id, a.horario_inicio, c.nome AS cliente_nome, c.whatsapp AS cliente_whats, b.nome AS barbearia_nome
+        SELECT 
+            a.id, 
+            c.nome AS cliente_nome, 
+            c.whatsapp AS cliente_whats, 
+            b.nome AS barbearia_nome, 
+            b.slug AS barbearia_slug,
+            a.horario_inicio
         FROM agendamentos a
         JOIN clientes c ON a.cliente_id = c.id
         JOIN barbearias b ON a.barbearia_id = b.id
@@ -38,56 +39,63 @@ try {
         exit;
     }
 
-    // 2. Configurações da Evolution API (Substitua pelos dados do Docker no seu Droplet)
-    $api_url = "http://127.0.0"; 
-    $api_key = "sua_apikey_da_evolution_api";
+    $api_url_base = "http://localhost:8080";
+    $api_key_global = "mY@pikey"; // Sua chave de autenticação configurada no Docker
 
+    // 3. Loop de disparos individuais
     foreach ($agendamentos as $ag) {
-        $numero_whats = $ag['cliente_whats'];
-        $horario_formatado = date('H:i', strtotime($ag['horario_inicio']));
+        $numero_whats = trim($ag['cliente_whats']);
         
-        // Texto personalizado comercial focado em conversão e redução de faltas
-        $mensagem = "Olá, *{$ag['cliente_nome']}*! ✂️\n\n";
-        $mensagem .= "Passando para lembrar que seu horário na *{$ag['barbearia_nome']}* está confirmado hoje às *{$horario_formatado}*.\n\n";
-        $mensagem .= "Se tiver algum imprevisto, avise com antecedência. Estamos te esperando!";
+        // No ecossistema Multi-tenant, o nome da instância usa o prefixo e o slug cadastrado no banco
+        $instancia_nome = "barber_" . $ag['barbearia_slug'];
+        
+        $horario_formatado = date('H:i', strtotime($ag['horario_inicio']));
 
-        // Payload exigido pela Evolution API
+        // Montagem do texto em Dark Premium
+        $texto_mensagem = "Olá, *{$ag['cliente_nome']}*! ✂️\n\n";
+        $texto_mensagem .= "Passando para lembrar que seu horário na *{$ag['barbearia_nome']}* está confirmado hoje às *{$horario_formatado}*.\n\n";
+        $texto_mensagem .= "Se precisar reagendar ou cancelar, acesse o painel pelo link público. Te esperamos!";
+
+        // Montagem do payload exigido pela Evolution v2.x
         $payload = [
             "number" => $numero_whats,
-            "options" => [
-                "delay" => 1200,
-                "presence" => "composing"
-            ],
-            "textMessage" => [
-                "text" => $mensagem
-            ]
+            "text" => $texto_mensagem,
+            "delay" => 1200,
+            "linkPreview" => false
         ];
 
-        // Disparo via cURL (Mais performático no PHP para APIs externas)
-            // ... código anterior do cURL igual (curl_init, curl_setopt, etc) ...
-    
+        // Inicializa o cURL estritamente DENTRO do loop para cada cliente
+        $ch = curl_init("$api_url_base/message/sendText/$instancia_nome");
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "Content-Type: application/json",
+            "X-API-Key: $api_key_global",
+            "apikey: $api_key_global"
+        ]);
+
         $response = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        // DEBUG SÊNIOR: Transforma a resposta em array para ler o erro real da v2.x
         $res_decodificada = json_decode($response, true);
 
         if ($http_code === 200 || $http_code === 201) {
-            // Altere a query abaixo de acordo com o nome exato da sua coluna de controle
+            // Sucesso: Atualiza o status no banco para evitar disparos duplicados
             $stmtUpdate = $db->prepare("UPDATE agendamentos SET notificacao_enviada = 1 WHERE id = ?");
             $stmtUpdate->execute([$ag['id']]);
             
-            echo "[2026-10-08 Dinâmico] 🚀 Enviado com sucesso para: {$ag['cliente_nome']} ({$numero_whats})\n";
+            echo "[" . date('H:i:s') . "] 🚀 Lembrete enviado com sucesso para: {$ag['cliente_nome']} ($numero_whats)\n";
         } else {
-            // Se der erro, o PHP vai cuspir EXATAMENTE o motivo do bloqueio na tela do terminal!
-            echo "[ERRO HTTP {$http_code}] Falha ao disparar para {$ag['cliente_nome']}. Motivo: ";
-            echo isset($res_decodificada['message']) ? json_encode($res_decodificada['message']) : $response;
+            // Falha: Exibe o motivo exato retornado pelo Docker da Evolution v2
+            echo "[" . date('H:i:s') . "] ❌ Erro HTTP {$http_code} para {$ag['cliente_nome']}: ";
+            echo isset($res_decodificada['message']) ? (is_array($res_decodificada['message']) ? json_encode($res_decodificada['message']) : $res_decodificada['message']) : $response;
             echo "\n";
         }
-
     }
 
 } catch (Exception $e) {
-    echo "[" . date('Y-m-d H:i:s') . "] ERRO NO CRON: " . $e->getMessage() . "\n";
+    echo "Erro crítico no Cron Job: " . $e->getMessage() . "\n";
 }
