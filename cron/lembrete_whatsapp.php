@@ -64,27 +64,28 @@ try {
         ];
 
         // Disparo via cURL (Mais performático no PHP para APIs externas)
-        $ch = curl_init($api_url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Content-Type: application/json",
-            "apikey: $api_key"
-        ]);
-        
+            // ... código anterior do cURL igual (curl_init, curl_setopt, etc) ...
+    
         $response = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        // 3. Se a API aceitou o envio (Status 200 ou 201), atualiza no banco para evitar duplicidade
+        // DEBUG SÊNIOR: Transforma a resposta em array para ler o erro real da v2.x
+        $res_decodificada = json_decode($response, true);
+
         if ($http_code === 200 || $http_code === 201) {
-            $update = $db->prepare("UPDATE agendamentos SET notificacao_enviada = 1 WHERE id = ?");
-            $update->execute([$ag['id']]);
-            echo "[" . date('Y-m-d H:i:s') . "] Lembrete enviado com sucesso para: {$ag['cliente_nome']} ({$numero_whats})\n";
+            // Altere a query abaixo de acordo com o nome exato da sua coluna de controle
+            $stmtUpdate = $db->prepare("UPDATE agendamentos SET notificacao_enviada = 1 WHERE id = ?");
+            $stmtUpdate->execute([$ag['id']]);
+            
+            echo "[2026-10-08 Dinâmico] 🚀 Enviado com sucesso para: {$ag['cliente_nome']} ({$numero_whats})\n";
         } else {
-            echo "[" . date('Y-m-d H:i:s') . "] Falha ao enviar para ID {$ag['id']}. Código HTTP: $http_code\n";
+            // Se der erro, o PHP vai cuspir EXATAMENTE o motivo do bloqueio na tela do terminal!
+            echo "[ERRO HTTP {$http_code}] Falha ao disparar para {$ag['cliente_nome']}. Motivo: ";
+            echo isset($res_decodificada['message']) ? json_encode($res_decodificada['message']) : $response;
+            echo "\n";
         }
+
     }
 
 } catch (Exception $e) {
