@@ -156,7 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gerar_qr'])) {
                 </div>
                 
                 <!-- CORREÇÃO: Botão modificado para recarregar enviando uma ação post limpa para o PHP atualizar o robô para ATIVO se o celular já leu -->
-                <a href="" class="btn btn-success fw-bold mt-3 w-100 py-2 rounded-3 shadow">
+                <a href="/agenda/<?php echo $slug_filtrado; ?>/admin/whatsapp" class="btn btn-success fw-bold mt-3 w-100 py-2 rounded-3 shadow">
                     <i class="fa-solid fa-circle-check me-1"></i> Já escaneei, atualizar status
                 </a>
             <?php endif; ?>
