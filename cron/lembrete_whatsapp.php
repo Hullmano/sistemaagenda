@@ -39,7 +39,7 @@ try {
         exit;
     }
 
-    $api_url_base = "http://172.18.0.2:8080";
+    $api_url_base = "http://evolution-api:8080";
     $api_key_global = "mY@pikey"; // Sua chave de autenticação configurada no Docker
 
     // 3. Loop de disparos individuais
