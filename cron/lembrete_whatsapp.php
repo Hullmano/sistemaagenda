@@ -65,7 +65,7 @@ try {
         $json_payload = json_encode($payload, JSON_UNESCAPED_UNICODE);
 
         // 4º: MONTA O COMANDO CURL DO LINUX (Usando 127.0.0.1 para falar com o Docker)
-        $comando_linux = "curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0{$instancia_nome} " .
+        $comando_linux = "curl -s -o /dev/null -w '%{http_code}' -X POST http://172.18.0.1:8080/message/sendText/{$instancia_nome} " .
                          "-H 'Content-Type: application/json' " .
                          "-H 'X-API-Key: {$api_key_global}' " .
                          "-H 'apikey: {$api_key_global}' " .
