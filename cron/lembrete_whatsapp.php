@@ -56,46 +56,35 @@ try {
         $texto_mensagem .= "Passando para lembrar que seu horário na *{$ag['barbearia_nome']}* está confirmado hoje às *{$horario_formatado}*.\n\n";
         $texto_mensagem .= "Se precisar reagendar ou cancelar, acesse o painel pelo link público. Te esperamos!";
 
-        // Montagem do payload exigido pela Evolution v2.x
-        $payload = [
-            "number" => $numero_whats,
-            "text" => $texto_mensagem,
-            "delay" => 1200,
-            "linkPreview" => false
-        ];
+               // ... código anterior de montagem da mensagem e payload igual ...
 
-        // Inicializa o cURL estritamente DENTRO do loop para cada cliente
-        $ch = curl_init("$api_url_base/message/sendText/$instancia_nome");
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Content-Type: application/json",
-            "X-API-Key: $api_key_global",
-            "apikey: $api_key_global"
-        ]);
+        // TRANSFORMA O PAYLOAD EM STRING JSON LIMPA
+        $json_payload = json_encode($payload, JSON_UNESCAPED_UNICODE);
 
-        $response = curl_exec($ch);
-        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+        // CONFIGURAÇÃO DEFINITIVA: Dispara usando o cURL nativo do Linux Ubuntu (Imune ao Erro 0 do PHP)
+        // Usamos o localhost:8080 porque a porta está mapeada com sucesso no Docker do servidor
+        $comando_linux = "curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0{$instancia_nome} " .
+                         "-H 'Content-Type: application/json' " .
+                         "-H 'X-API-Key: {$api_key_global}' " .
+                         "-H 'apikey: {$api_key_global}' " .
+                         "-d " . escapeshellarg($json_payload);
 
-        $res_decodificada = json_decode($response, true);
+        // Executa o comando no terminal do Droplet e captura o código de resposta (Ex: 201)
+        $http_code = (int)exec($comando_linux);
 
         if ($http_code === 200 || $http_code === 201) {
-            // Sucesso: Atualiza o status no banco para evitar disparos duplicados
+            // Sucesso: Atualiza o status no banco de dados para marcar como enviado
             $stmtUpdate = $db->prepare("UPDATE agendamentos SET notificacao_enviada = 1 WHERE id = ?");
             $stmtUpdate->execute([$ag['id']]);
             
             echo "[" . date('H:i:s') . "] 🚀 Lembrete enviado com sucesso para: {$ag['cliente_nome']} ($numero_whats)\n";
         } else {
-            // Falha: Exibe o motivo exato retornado pelo Docker da Evolution v2
-            echo "[" . date('H:i:s') . "] ❌ Erro HTTP {$http_code} para {$ag['cliente_nome']}: ";
-            echo isset($res_decodificada['message']) ? (is_array($res_decodificada['message']) ? json_encode($res_decodificada['message']) : $res_decodificada['message']) : $response;
-            echo "\n";
+            // Falha: Mostra qual foi o retorno de erro da Evolution API
+            echo "[" . date('H:i:s') . "] ❌ Falha no envio. Código de resposta da API: HTTP {$http_code}\n";
         }
     }
 
 } catch (Exception $e) {
     echo "Erro crítico no Cron Job: " . $e->getMessage() . "\n";
 }
+
