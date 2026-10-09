@@ -42,34 +42,36 @@ try {
     $api_url_base = "http://172.18.0.1:8080";
     $api_key_global = "mY@pikey"; // Sua chave de autenticação configurada no Docker
 
-    // 3. Loop de disparos individuais
+        // 3. Loop de disparos individuais
     foreach ($agendamentos as $ag) {
         $numero_whats = trim($ag['cliente_whats']);
-        
-        // No ecossistema Multi-tenant, o nome da instância usa o prefixo e o slug cadastrado no banco
         $instancia_nome = "barber_" . $ag['barbearia_slug'];
-        
         $horario_formatado = date('H:i', strtotime($ag['horario_inicio']));
 
-        // Montagem do texto em Dark Premium
+        // 1º: MONTA O TEXTO DA MENSAGEM
         $texto_mensagem = "Olá, *{$ag['cliente_nome']}*! ✂️\n\n";
         $texto_mensagem .= "Passando para lembrar que seu horário na *{$ag['barbearia_nome']}* está confirmado hoje às *{$horario_formatado}*.\n\n";
         $texto_mensagem .= "Se precisar reagendar ou cancelar, acesse o painel pelo link público. Te esperamos!";
 
-               // ... código anterior de montagem da mensagem e payload igual ...
+        // 2º: CRIA O PAYLOAD QUE A EVOLUTION API EXIGE
+        $payload = [
+            "number" => $numero_whats,
+            "text" => $texto_mensagem,
+            "delay" => 1200,
+            "linkPreview" => false
+        ];
 
-        // TRANSFORMA O PAYLOAD EM STRING JSON LIMPA
+        // 3º: TRANSFORMA O PAYLOAD EM STRING JSON LIMPA
         $json_payload = json_encode($payload, JSON_UNESCAPED_UNICODE);
 
-        // CONFIGURAÇÃO DEFINITIVA: Dispara usando o cURL nativo do Linux Ubuntu (Imune ao Erro 0 do PHP)
-        // Usamos o localhost:8080 porque a porta está mapeada com sucesso no Docker do servidor
+        // 4º: MONTA O COMANDO CURL DO LINUX (Usando 127.0.0.1 para falar com o Docker)
         $comando_linux = "curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0{$instancia_nome} " .
                          "-H 'Content-Type: application/json' " .
                          "-H 'X-API-Key: {$api_key_global}' " .
                          "-H 'apikey: {$api_key_global}' " .
                          "-d " . escapeshellarg($json_payload);
 
-        // Executa o comando no terminal do Droplet e captura o código de resposta (Ex: 201)
+        // 5º: EXECUTA O DISPARO DIRETO PELO TERMINAL DO UBUNTU
         $http_code = (int)exec($comando_linux);
 
         if ($http_code === 200 || $http_code === 201) {
@@ -87,4 +89,3 @@ try {
 } catch (Exception $e) {
     echo "Erro crítico no Cron Job: " . $e->getMessage() . "\n";
 }
-
