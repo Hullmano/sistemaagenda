@@ -39,7 +39,7 @@ try {
         exit;
     }
 
-    $api_url_base = "http://172.17.0.1:8080";
+    $api_url_base = "http://24.144.100.86:8080";
     $api_key_global = "mY@pikey"; // Sua chave de autenticação configurada no Docker
 
     // 3. Loop de disparos individuais
