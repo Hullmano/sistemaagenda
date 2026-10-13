@@ -1,8 +1,6 @@
 <?php
 // views/cliente_agendamento.php
 
-date_default_timezone_set('America/Sao_Paulo');
-
 // 1. Busca os serviços reais da barbearia para listar no Passo 1
 $db = \Database::getConnection();
 $stmt = $db->prepare("SELECT id, nome, preco, duracao_minutos FROM servicos WHERE barbearia_id = ? AND ativo = 1 ORDER BY nome ASC");
@@ -119,6 +117,10 @@ $servicos_reais = $stmt->fetchAll();
                 </div>
             </div>
 
+            <div class="card-custom p-3">
+                <p class="small text-secondary">Se seu cadastro anterior tem algum dado incorreto, solicite a correção.</p>
+                <button type="button" class="btn btn-outline-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalCorrecao">Solicitar correção dos meus dados</button>
+            </div>
             <!-- Botão Confirmar -->
             <div class="pt-2">
                 <button id="btn-finalizar" class="btn btn-warning w-100 py-3 fw-bold text-dark text-uppercase shadow shadow-lg" style="border-radius: 12px; letter-spacing: 0.5px;">
@@ -129,8 +131,28 @@ $servicos_reais = $stmt->fetchAll();
         </div>
     </main>
 
+    <div class="modal fade" id="modalCorrecao" tabindex="-1" aria-labelledby="tituloCorrecao" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="background:#151B2C;color:white">
+        <form id="form-correcao">
+          <div class="modal-header"><h5 class="modal-title" id="tituloCorrecao">Solicitar correção cadastral</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button></div>
+          <div class="modal-body">
+            <p class="small text-secondary">Informe os dados. A alteração dependerá de análise da barbearia.</p>
+            <label for="correcao-atual" class="form-label">WhatsApp do cadastro atual</label>
+            <input id="correcao-atual" type="tel" class="form-control input-custom mb-3" maxlength="20" required>
+            <label for="correcao-nome" class="form-label">Nome correto</label>
+            <input id="correcao-nome" class="form-control input-custom mb-3" maxlength="120" required>
+            <label for="correcao-novo" class="form-label">WhatsApp correto</label>
+            <input id="correcao-novo" type="tel" class="form-control input-custom mb-3" maxlength="20" required>
+            <label for="correcao-obs" class="form-label">Observação (opcional)</label>
+            <textarea id="correcao-obs" class="form-control input-custom mb-3" maxlength="500"></textarea>
+            <p id="correcao-retorno" class="small" role="status" aria-live="polite"></p>
+          </div>
+          <div class="modal-footer"><button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Cancelar</button><button type="submit" id="btn-correcao" class="btn btn-warning">Enviar solicitação</button></div>
+        </form>
+      </div></div>
+    </div>
     <!-- Bootstrap 5 JavaScript via CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <!-- Motor AJAX Otimizado para a subpasta /agenda -->
     <script>
@@ -246,6 +268,33 @@ $servicos_reais = $stmt->fetchAll();
             });
         });
 
+        document.getElementById('form-correcao').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btn-correcao');
+            const aviso = document.getElementById('correcao-retorno');
+            btn.disabled = true;
+            aviso.textContent = 'Enviando...';
+            try {
+                const r = await fetch('/agenda/api/solicitar_correcao_cadastro.php', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({
+                        barbearia_id: barbeariaId,
+                        whatsapp_atual: document.getElementById('correcao-atual').value,
+                        nome_corrigido: document.getElementById('correcao-nome').value,
+                        whatsapp_corrigido: document.getElementById('correcao-novo').value,
+                        observacao: document.getElementById('correcao-obs').value
+                    })
+                });
+                const dados = await r.json();
+                aviso.textContent = dados.mensagem || dados.erro || 'Falha no envio.';
+                aviso.className = 'small ' + (dados.sucesso ? 'text-success' : 'text-danger');
+                if (dados.sucesso) e.target.reset();
+            } catch (err) {
+                aviso.textContent = 'Falha de comunicação. Tente novamente.';
+                aviso.className = 'small text-danger';
+            } finally { btn.disabled = false; }
+        });
         carregarHorarios();
     });
     </script>

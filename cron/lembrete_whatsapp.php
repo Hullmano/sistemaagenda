@@ -17,7 +17,8 @@ if (!$api_key) {
 try {
     $db = \Database::getConnection();
 
-    // Agendamentos entre 50 e 60 minutos à frente.
+    // Enviar lembrete para qualquer agendamento futuro nos proximos 60 minutos.
+    // Inclui agendamentos criados com apenas 15 minutos de antecedencia.
     $agora = new DateTimeImmutable('now');
 
     $inicio = $agora->modify('+50 minutes');
@@ -78,7 +79,7 @@ try {
             "Olá, *{$ag['cliente_nome']}*! ✂️\n\n" .
             "Passando para lembrar que seu horário na " .
             "*{$ag['barbearia_nome']}* está confirmado " .
-            "hoje às *{$horario}*.\n\n" .
+            "{$diaAtendimento} às *{$horario}*.\n\n" .
             "Se precisar reagendar ou cancelar, " .
             "entre em contato com a barbearia.";
 
