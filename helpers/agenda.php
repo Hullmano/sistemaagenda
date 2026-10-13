@@ -4,6 +4,14 @@
 date_default_timezone_set('America/Sao_Paulo');
 
 function obterHorariosLivres($db, $barbearia_id, $data_desejada, $duracao_servico_minutos) {
+    $fuso = new DateTimeZone('America/Sao_Paulo');
+    $hoje = new DateTimeImmutable('today', $fuso);
+    $data = DateTimeImmutable::createFromFormat('!Y-m-d', $data_desejada, $fuso);
+    if (!$data || $data->format('Y-m-d') !== $data_desejada || $data < $hoje) {
+        return [];
+    }
+    $limite_agendamento = (new DateTimeImmutable('now', $fuso))->modify('+15 minutes');
+
     // 1. Descobrir o dia da semana (0 = Domingo, 6 = Sábado)
     $dia_semana = date('w', strtotime($data_desejada));
 
@@ -45,22 +53,14 @@ function obterHorariosLivres($db, $barbearia_id, $data_desejada, $duracao_servic
     // Loop para testar cada slot de horário do dia
     while ($atual < $fim_expediente) {
         
-        // ----------------=====================================================
-        // TRAVA DE SEGURANÇA COM MARGEM DE ANTECEDÊNCIA SE FOR HOJE
-        // ----------------=====================================================
-        if ($data_desejada === date('Y-m-d')) {
-            $hora_do_slot = date('H:i', $atual); // Ex: '17:00'
-            
-            // Calcula o horário limite adicionando 15 minutos de antecedência de segurança
-            // Se no relógio do servidor for 16:40, o cliente só agenda a partir de 16:55
-            $hora_relogio_com_margem = date('H:i', strtotime('+15 minutes')); 
-
-            if ($hora_do_slot <= $hora_relogio_com_margem) {
-                $atual += $intervalo;
-                continue; // Pula o horário passado ou colado demais
-            }
+        // Bloqueia horários anteriores ao momento atual + 15 minutos.
+        $inicio_slot = DateTimeImmutable::createFromFormat(
+            '!Y-m-d H:i:s', $data_desejada . ' ' . date('H:i:s', $atual), $fuso
+        );
+        if (!$inicio_slot || $inicio_slot <= $limite_agendamento) {
+            $atual += $intervalo;
+            continue;
         }
-        // ----------------=====================================================
 
         // Calcula o horário hipotético de término deste serviço
         $termino_servico = $atual + ($duracao_servico_minutos * 60);

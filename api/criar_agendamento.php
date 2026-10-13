@@ -29,6 +29,25 @@ if ($barbearia_id <= 0 || $servico_id <= 0 || empty($data_agendamento) || empty(
     exit;
 }
 
+// Segurança no servidor: rejeita data/hora passada ou muito próxima.
+$fuso = new DateTimeZone('America/Sao_Paulo');
+$inicio_reserva = DateTimeImmutable::createFromFormat(
+    '!Y-m-d H:i', $data_agendamento . ' ' . substr($horario_inicio, 0, 5), $fuso
+);
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data_agendamento)
+    || !preg_match('/^\d{2}:\d{2}(?::00)?$/', $horario_inicio)
+    || !$inicio_reserva
+    || $inicio_reserva->format('Y-m-d H:i') !== $data_agendamento . ' ' . substr($horario_inicio, 0, 5)) {
+    http_response_code(400);
+    echo json_encode(['erro' => 'Data ou horário inválido.']);
+    exit;
+}
+if ($inicio_reserva <= (new DateTimeImmutable('now', $fuso))->modify('+15 minutes')) {
+    http_response_code(400);
+    echo json_encode(['erro' => 'Escolha um horário futuro com pelo menos 15 minutos de antecedência.']);
+    exit;
+}
+
 // Limpa o WhatsApp para salvar apenas números (Padrão Evolution API)
 $whatsapp_limpo = preg_replace('/[^0-9]/', '', $whatsapp_cliente);
 if (strlen($whatsapp_limpo) < 10) { // Validação mínima de 10 dígitos (DDD + número)

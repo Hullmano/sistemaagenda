@@ -21,6 +21,14 @@ if ($barbearia_id <= 0 || empty($data_desejada) || $servico_id <= 0) {
     exit;
 }
 
+$fuso = new DateTimeZone('America/Sao_Paulo');
+$data_valida = DateTimeImmutable::createFromFormat('!Y-m-d', $data_desejada, $fuso);
+if (!$data_valida || $data_valida->format('Y-m-d') !== $data_desejada || $data_valida < new DateTimeImmutable('today', $fuso)) {
+    http_response_code(400);
+    echo json_encode(['erro' => 'Escolha uma data de hoje em diante.']);
+    exit;
+}
+
 try {
     $db = \Database::getConnection();
 

@@ -1,6 +1,8 @@
 <?php
 // views/cliente_agendamento.php
 
+date_default_timezone_set('America/Sao_Paulo');
+
 // 1. Busca os serviços reais da barbearia para listar no Passo 1
 $db = \Database::getConnection();
 $stmt = $db->prepare("SELECT id, nome, preco, duracao_minutos FROM servicos WHERE barbearia_id = ? AND ativo = 1 ORDER BY nome ASC");
