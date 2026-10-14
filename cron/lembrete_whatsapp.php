@@ -21,9 +21,11 @@ try {
     // Inclui agendamentos criados com apenas 15 minutos de antecedencia.
     $agora = new DateTimeImmutable('now');
 
-    $inicio = $agora->modify('+50 minutes');
-    $fim = $agora->modify('+60 minutes');
+    $agora = new DateTimeImmutable('now');
 
+    $inicio = $agora;
+    $fim = $agora->modify('+60 minutes');
+    
     $sql = "
         SELECT
             a.id,
