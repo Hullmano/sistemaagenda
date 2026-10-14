@@ -20,9 +20,6 @@ try {
     // Enviar lembrete para qualquer agendamento futuro nos proximos 60 minutos.
     // Inclui agendamentos criados com apenas 15 minutos de antecedencia.
     $agora = new DateTimeImmutable('now');
-
-    $agora = new DateTimeImmutable('now');
-
     $inicio = $agora;
     $fim = $agora->modify('+60 minutes');
     
@@ -77,6 +74,25 @@ try {
 
         $horario = substr($ag['horario_inicio'], 0, 5);
 
+        // Identificar o dia do atendimento
+        $dataAtendimento = new DateTimeImmutable(
+            $ag['data_agendamento']
+        );
+
+        $hoje = new DateTimeImmutable('today');
+
+        if ($dataAtendimento->format('Y-m-d') === $hoje->format('Y-m-d')) {
+            $diaAtendimento = 'hoje';
+        } elseif (
+            $dataAtendimento->format('Y-m-d') ===
+            $hoje->modify('+1 day')->format('Y-m-d')
+        ) {
+            $diaAtendimento = 'amanhã';
+        } else {
+            $diaAtendimento = 'no dia ' . $dataAtendimento->format('d/m/Y');
+        }
+
+        // Montar mensagem do WhatsApp
         $mensagem =
             "Olá, *{$ag['cliente_nome']}*! ✂️\n\n" .
             "Passando para lembrar que seu horário na " .
