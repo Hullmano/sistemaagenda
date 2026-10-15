@@ -4,6 +4,7 @@ header('Content-Type: application/json; charset=utf-8');
 
 require_once '../db.php';
 require_once '../helpers/agenda.php';
+require_once '../helpers/telefone.php';
 
 // Permite apenas requisições POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -48,11 +49,11 @@ if ($inicio_reserva <= (new DateTimeImmutable('now', $fuso))->modify('+15 minute
     exit;
 }
 
-// Limpa o WhatsApp para salvar apenas números (Padrão Evolution API)
-$whatsapp_limpo = preg_replace('/[^0-9]/', '', $whatsapp_cliente);
-if (strlen($whatsapp_limpo) < 10) { // Validação mínima de 10 dígitos (DDD + número)
+// Padrao unico para clientes brasileiros: +55 + DDD + numero.
+$whatsapp_limpo = normalizarWhatsappBR($whatsapp_cliente);
+if ($whatsapp_limpo === null) {
     http_response_code(400);
-    echo json_encode(['erro' => 'Por favor, insira um número de WhatsApp válido com DDD.']);
+    echo json_encode(['erro' => 'Informe um WhatsApp brasileiro valido com DDD.']);
     exit;
 }
 
@@ -82,8 +83,8 @@ try {
     }
 
     // 5. Salva ou localiza o Cliente na tabela (Evita duplicar cadastros do mesmo número)
-    $stmt = $db->prepare("SELECT id FROM clientes WHERE barbearia_id = ? AND whatsapp = ? LIMIT 1");
-    $stmt->execute([$barbearia_id, $whatsapp_limpo]);
+    $stmt = $db->prepare("SELECT id FROM clientes WHERE barbearia_id = ? AND whatsapp IN (?, ?) ORDER BY id LIMIT 1");
+    $stmt->execute([$barbearia_id, $whatsapp_limpo, substr($whatsapp_limpo, 2)]);
     $cliente = $stmt->fetch();
 
     if ($cliente) {

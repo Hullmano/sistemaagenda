@@ -113,7 +113,10 @@ $servicos_reais = $stmt->fetchAll();
                 </div>
                 <div class="d-flex flex-column gap-2">
                     <input type="text" id="cliente-nome" placeholder="Seu Nome Completo" class="form-control input-custom" required>
-                    <input type="tel" id="cliente-whatsapp" placeholder="WhatsApp com DDD (Ex: 62999999999)" class="form-control input-custom" required>
+                    <input type="tel" id="cliente-whatsapp" placeholder="DDD + telefone (ex.: 62999999999)" inputmode="tel" autocomplete="tel-national" class="form-control input-custom" required>
+                    <div class="small text-secondary">🇧🇷 +55 sera acrescentado automaticamente.</div>
+                    <label class="small text-secondary"><input type="checkbox" id="lembrar-cliente"> Lembrar meus dados neste navegador</label>
+                    <button type="button" id="esquecer-cliente" class="btn btn-outline-secondary btn-sm">Nao sou eu / Limpar dados salvos</button>
                 </div>
             </div>
 
@@ -164,6 +167,22 @@ $servicos_reais = $stmt->fetchAll();
         const campoNome = document.getElementById('cliente-nome');
         const campoWhats = document.getElementById('cliente-whatsapp');
         let horarioSelecionado = '';
+        // Salva apenas no navegador, com consentimento. Nunca e prova de identidade.
+        const chaveLocal = 'agenda_cliente_' + barbeariaId;
+        const lembrar = document.getElementById('lembrar-cliente');
+        try {
+            const dadosSalvos = JSON.parse(localStorage.getItem(chaveLocal) || 'null');
+            if (dadosSalvos && typeof dadosSalvos.nome === 'string' && typeof dadosSalvos.whatsapp === 'string') {
+                campoNome.value = dadosSalvos.nome;
+                campoWhats.value = dadosSalvos.whatsapp;
+                lembrar.checked = true;
+            }
+        } catch (e) { /* armazenamento indisponivel */ }
+        document.getElementById('esquecer-cliente').addEventListener('click', () => {
+            try { localStorage.removeItem(chaveLocal); } catch(e) {}
+            campoNome.value = ''; campoWhats.value = ''; lembrar.checked = false;
+        });
+
 
         function carregarHorarios() {
             const dataSelecionada = campoData.value;
@@ -244,6 +263,13 @@ $servicos_reais = $stmt->fetchAll();
             .then(r => r.json())
             .then(res => {
                 if (res.sucesso) {
+                    try {
+                        if (lembrar.checked) {
+                            localStorage.setItem(chaveLocal, JSON.stringify({nome: campoNome.value.trim(), whatsapp: campoWhats.value.trim()}));
+                        } else {
+                            localStorage.removeItem(chaveLocal);
+                        }
+                    } catch (e) { /* navegador bloqueou armazenamento */ }
                     document.querySelector('main').innerHTML = `
                         <div class="card-custom text-center p-5 space-y-4 shadow shadow-lg border border-success" style="--bs-border-opacity: .3;">
                             <div class="text-success mb-3" style="font-size: 4rem;"><i class="fa-solid fa-circle-check animate-pulse"></i></div>

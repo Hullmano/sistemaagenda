@@ -63,9 +63,10 @@ try {
 
     foreach ($agendamentos as $ag) {
 
-        $numero = preg_replace('/\D+/', '', $ag['cliente_whats']);
+        require_once __DIR__ . '/../helpers/telefone.php';
+        $numero = normalizarWhatsappBR($ag['cliente_whats']);
 
-        if (!$numero) {
+        if ($numero === null) {
             echo "Agendamento {$ag['id']}: telefone vazio.\n";
             continue;
         }
