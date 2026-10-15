@@ -3,7 +3,16 @@
 
 // 1. CONFIGURAÇÕES INTERNAS DA EVOLUTION API NO DROPLET
 $api_url_base = "http://127.0.0.1:8080";
-$api_key_global = "mY@pikey"; 
+$config = require __DIR__ . '/../config.php';
+
+$api_key_global = $config['evolution_api_key']
+    ?? getenv('EVOLUTION_API_KEY');
+
+if (!$api_key_global) {
+    throw new RuntimeException(
+        'Chave da Evolution API não configurada.'
+    );
+}
 
 // Ajuste automático do nome da instância utilizando o slug da barbearia
 $instancia_nome = isset($slug_filtrado) && !empty($slug_filtrado) ? "barber_" . $slug_filtrado : "barber_do_tiao"; 
