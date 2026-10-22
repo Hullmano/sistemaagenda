@@ -96,8 +96,6 @@ $servicos = $stmt->fetchAll();
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form id="form-add-servico">
-                    <input type="hidden" name="barbearia_id" value="<?php echo $barbearia_id; ?>">
-                    
                     <div class="mb-3">
                         <label class="form-label small text-secondary fw-semibold">Nome do Serviço</label>
                         <input type="text" name="nome" class="form-control input-custom" placeholder="Ex: Corte Degradê" required>
@@ -121,9 +119,14 @@ $servicos = $stmt->fetchAll();
     </div>
 
     <!-- Scripts AJAX -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
+    const csrfToken = <?= json_encode(
+        gerarTokenCsrf(),
+        JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+    ) ?>;
+
     // Envio do formulário via AJAX para salvar
     document.getElementById('form-add-servico').addEventListener('submit', function(e) {
         e.preventDefault();
@@ -132,7 +135,7 @@ $servicos = $stmt->fetchAll();
         fetch('/agenda/api/salvar_servico.php', {
             method: 'POST',
             body: JSON.stringify(dadosForm),
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }
         })
         .then(r => r.json())
         .then(res => {
@@ -149,8 +152,12 @@ $servicos = $stmt->fetchAll();
             fetch('/agenda/api/deletar_servico.php', {
                 method: 'POST',
                 body: JSON.stringify({ id: this.dataset.id }),
-                headers: { 'Content-Type': 'application/json' }
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                }
             })
+
             .then(r => r.json())
             .then(res => {
                 if (res.sucesso) window.location.reload();

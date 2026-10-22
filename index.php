@@ -32,33 +32,77 @@ if ($barbearia) {
     $barbearia_nome = $barbearia['nome'];
     
     // 4. VALIDAÇÃO DE ROTAS ADMINISTRATIVAS
-    // Verifica se o segundo segmento existe e é estritamente 'admin'
-    // --- BLOCO CORRIGIDO DE ROTAS NO INDEX.PHP ---
     // Verifica se o segundo segmento da URL existe e é estritamente 'admin'
     // Ex: /agenda/barbearia_do_tiao/admin
     if (isset($partes[1]) && $partes[1] === 'admin') {
-        
-        // Verifica o terceiro segmento da URL para carregar as sub-telas
-        $sub_acao = isset($partes[2]) ? $partes[2] : '';
-        
-        if ($sub_acao === 'servicos') {
-            // Ex: /agenda/barbearia_do_tiao/admin/servicos
-            include 'views/admin_servicos.php';
-        } elseif ($sub_acao === 'horarios') {
-            // Ex: /agenda/barbearia_do_tiao/admin/horarios
-            include 'views/admin_horarios.php';
-        } elseif ($sub_acao === 'whatsapp') {
-            // Ex: /agenda/barbearia_do_tiao/admin/whatsapp
-            include 'views/admin_whatsapp.php';
-        } else {
-            // Se for apenas /admin, abre o dashboard principal
-            include 'views/admin_painel.php';
+
+        require_once __DIR__ . '/helpers/auth.php';
+
+        iniciarSessaoAdmin();
+
+        $sub_acao = $partes[2] ?? '';
+
+        // A tela de login pode ser acessada sem autenticação.
+        if ($sub_acao === 'login') {
+            $usuario = usuarioLogado();
+            if (
+                $usuario &&
+                (int) $usuario['barbearia_id'] === (int) $barbearia_id
+            ) {
+                header(
+                    'Location: /agenda/' .
+                    rawurlencode($slug_filtrado) .
+                    '/admin'
+                );
+                exit;
+            }
+            include __DIR__ . '/views/admin_login.php';
+            exit;
         }
-        
+
+        // Todas as demais páginas administrativas exigem login.
+        $usuario = usuarioLogado();
+        if (!$usuario) {
+            header(
+                'Location: /agenda/' .
+                rawurlencode($slug_filtrado) .
+                '/admin/login'
+            );
+            exit;
+        }
+
+        // Impede acesso administrativo a outra barbearia.
+        if ((int) $usuario['barbearia_id'] !== (int) $barbearia_id) {
+            http_response_code(403);
+            exit('Acesso negado a esta barbearia.');
+        }
+
+        // Áreas restritas ao proprietário.
+        $rotas_dono = ['servicos', 'horarios', 'whatsapp'];
+
+        if (
+            in_array($sub_acao, $rotas_dono, true) &&
+            $usuario['nivel'] !== 'dono'
+        ) {
+            http_response_code(403);
+            exit('Esta área é exclusiva do proprietário.');
+        }
+        if ($sub_acao === 'servicos') {
+            include __DIR__ . '/views/admin_servicos.php';
+        } elseif ($sub_acao === 'horarios') {
+            include __DIR__ . '/views/admin_horarios.php';
+        } elseif ($sub_acao === 'whatsapp') {
+            include __DIR__ . '/views/admin_whatsapp.php';
+        } elseif ($sub_acao === '') {
+            include __DIR__ . '/views/admin_painel.php';
+        } else {
+            http_response_code(404);
+            exit('Página não encontrada.');
+        }
     } else {
-        // Se não houver 'admin' na URL, carrega a tela do Cliente
-        include 'views/cliente_agendamento.php';
+        include __DIR__ . '/views/cliente_agendamento.php';
     }
+
 
 } else {
     http_response_code(404);

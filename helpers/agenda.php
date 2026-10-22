@@ -3,7 +3,8 @@
 // Força a API a ler o relógio de Brasília no AJAX
 date_default_timezone_set('America/Sao_Paulo');
 
-function obterHorariosLivres($db, $barbearia_id, $data_desejada, $duracao_servico_minutos) {
+
+function obterHorariosLivres( $db, $barbearia_id, $data_desejada, $duracao_servico_minutos, $ignorar_agendamento_id = 0) {
     $fuso = new DateTimeZone('America/Sao_Paulo');
     $hoje = new DateTimeImmutable('today', $fuso);
     $data = DateTimeImmutable::createFromFormat('!Y-m-d', $data_desejada, $fuso);
@@ -32,12 +33,16 @@ function obterHorariosLivres($db, $barbearia_id, $data_desejada, $duracao_servic
 
     // 3. Buscar os agendamentos já existentes/ocupados para este dia (que não estejam cancelados)
     $stmt = $db->prepare("
-        SELECT horario_inicio, horario_fim 
-        FROM agendamentos 
-        WHERE barbearia_id = ? AND data_agendamento = ? AND status != 'cancelado'
+        SELECT horario_inicio, horario_fim
+        FROM agendamentos
+        WHERE barbearia_id = ?
+        AND data_agendamento = ?
+        AND status != 'cancelado'
+        AND id != ?
         ORDER BY horario_inicio ASC
     ");
-    $stmt->execute([$barbearia_id, $data_desejada]);
+
+    $stmt->execute([$barbearia_id, $data_desejada, (int) $ignorar_agendamento_id]);
     $agendamentos_ocupados = $stmt->fetchAll();
 
     // 4. Gerar a grade de horários possíveis do dia (de 30 em 30 minutos)

@@ -1,79 +1,250 @@
 <?php
 // api/reagendar.php
+
 header('Content-Type: application/json; charset=utf-8');
-require_once '../db.php';
-require_once '../helpers/agenda.php';
+
+require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../helpers/agenda.php';
+require_once __DIR__ . '/../helpers/auth.php';
+
+function erroReagendamento(int $codigo, string $mensagem): void
+{
+    http_response_code($codigo);
+    echo json_encode(['erro' => $mensagem]);
+    exit;
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['erro' => 'Método não permitido.']);
-    exit;
+    erroReagendamento(405, 'Método não permitido.');
+}
+
+$usuario = usuarioLogado();
+
+if (!$usuario) {
+    erroReagendamento(401, 'Sessão expirada. Faça login novamente.');
+}
+
+if (!validarTokenCsrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? null)) {
+    erroReagendamento(403, 'Token de segurança inválido.');
 }
 
 $dados = json_decode(file_get_contents('php://input'), true);
 
-$agendamento_id = isset($dados['id']) ? (int)$dados['id'] : 0;
-$nova_data       = isset($dados['data']) ? trim($dados['data']) : '';
-$novo_horario    = isset($dados['horario']) ? trim($dados['horario']) : '';
+if (!is_array($dados)) {
+    erroReagendamento(400, 'JSON inválido.');
+}
 
-if ($agendamento_id <= 0 || empty($nova_data) || empty($novo_horario)) {
-    http_response_code(400);
-    echo json_encode(['erro' => 'Dados incompletos para o reagendamento.']);
-    exit;
+$id = filter_var($dados['id'] ?? null, FILTER_VALIDATE_INT);
+$data = $dados['data'] ?? '';
+$horario = $dados['horario'] ?? '';
+
+if (
+    !$id || $id <= 0 ||
+    !is_string($data) ||
+    !is_string($horario)
+) {
+    erroReagendamento(400, 'Dados inválidos.');
+}
+
+$fuso = new DateTimeZone('America/Sao_Paulo');
+
+if (
+    !preg_match('/^\d{4}-\d{2}-\d{2}$/', $data) ||
+    !preg_match('/^\d{2}:\d{2}(?::00)?$/', $horario)
+) {
+    erroReagendamento(400, 'Data ou horário inválido.');
+}
+
+$inicio = DateTimeImmutable::createFromFormat(
+    '!Y-m-d H:i',
+    $data . ' ' . substr($horario, 0, 5),
+    $fuso
+);
+
+if (
+    !$inicio ||
+    $inicio->format('Y-m-d H:i') !==
+        $data . ' ' . substr($horario, 0, 5)
+) {
+    erroReagendamento(400, 'Data ou horário inválido.');
+}
+
+if ($inicio <= (new DateTimeImmutable('now', $fuso))->modify('+15 minutes')) {
+    erroReagendamento(
+        400,
+        'Escolha um horário com pelo menos 15 minutos de antecedência.'
+    );
 }
 
 try {
-    $db = \Database::getConnection();
+    $db = Database::getConnection();
     $db->beginTransaction();
 
-    // 1. Busca os detalhes originais do agendamento (Barbearia e Serviço para saber a duração)
-    $stmt = $db->prepare("SELECT barbearia_id, servico_id FROM agendamentos WHERE id = ? LIMIT 1");
-    $stmt->execute([$agendamento_id]);
+    // Usa o mesmo bloqueio adotado na criação de agendamentos.
+    // Serializa as operações da mesma barbearia.
+    $stmt = $db->prepare("
+        SELECT id
+        FROM barbearias
+        WHERE id = ?
+        FOR UPDATE
+    ");
+
+    $stmt->execute([(int) $usuario['barbearia_id']]);
+
+    if (!$stmt->fetch()) {
+        throw new RuntimeException('Barbearia não encontrada.', 404);
+    }
+
+    // Mantém o bloqueio até COMMIT ou ROLLBACK.
+
+    // Bloqueia o registro durante o reagendamento.
+    $stmt = $db->prepare("
+        SELECT
+            id,
+            barbearia_id,
+            usuario_id,
+            servico_id,
+            status
+        FROM agendamentos
+        WHERE id = ?
+        FOR UPDATE
+    ");
+    $stmt->execute([$id]);
     $agendamento = $stmt->fetch();
 
     if (!$agendamento) {
-        throw new Exception('Agendamento não localizado.');
+        throw new RuntimeException('Agendamento não encontrado.', 404);
     }
 
-    $barbearia_id = $agendamento['barbearia_id'];
-
-    // 2. Busca a duração do serviço
-    $stmt = $db->prepare("SELECT duracao_minutos FROM servicos WHERE id = ? LIMIT 1");
-    $stmt->execute([$agendamento['servico_id']]);
-    $servico = $stmt->fetch();
-    $duracao_minutos = (int)$servico['duracao_minutos'];
-
-    // 3. Double-Check: Roda o algoritmo para ver se o horário está realmente livre na nova data
-    // 3. Double-Check de Segurança: O horário ainda está de fato livre?
-    // CORREÇÃO: Passando explicitamente os 4 argumentos que a função exige no helpers/agenda.php
-    $horarios_livres = obterHorariosLivres($db, $barbearia_id, $nova_data, $duracao_minutos);
-    
-    // Converte o novo horário recebido para o formato comparável 'H:i' (Ex: '14:30')
-    $horario_teste = date('H:i', strtotime($novo_horario));
-
-    if (!in_array($horario_teste, $horarios_livres)) {
-        throw new Exception('Infelizmente, este horário acabou de ser ocupado. Por favor, escolha outro slot.');
+    if (!podeGerenciarAgendamento($usuario, $agendamento)) {
+        throw new RuntimeException(
+            'Você não tem permissão para reagendar este atendimento.',
+            403
+        );
     }
 
+    if ($agendamento['status'] !== 'agendado') {
+        throw new RuntimeException(
+            'Somente agendamentos pendentes podem ser reagendados.',
+            409
+        );
+    }
 
-    // 4. Calcula o novo horário de término
-    $timestamp_inicio = strtotime($novo_horario);
-    $horario_fim = date('H:i:s', $timestamp_inicio + ($duracao_minutos * 60));
-    $horario_inicio_formatado = date('H:i:s', $timestamp_inicio);
-
-    // 5. Atualiza o agendamento e reseta o controle do WhatsApp para o robô reenviar o lembrete na nova hora
+    // Serviço precisa pertencer à mesma barbearia.
     $stmt = $db->prepare("
-        UPDATE agendamentos 
-        SET data_agendamento = ?, horario_inicio = ?, horario_fim = ?, notificacao_enviada = 0 
+        SELECT duracao_minutos
+        FROM servicos
         WHERE id = ?
+          AND barbearia_id = ?
+        LIMIT 1
     ");
-    $stmt->execute([$nova_data, $horario_inicio_formatado, $horario_fim, $agendamento_id]);
+    $stmt->execute([
+        $agendamento['servico_id'],
+        $agendamento['barbearia_id']
+    ]);
+
+    $servico = $stmt->fetch();
+
+    if (!$servico || (int) $servico['duracao_minutos'] <= 0) {
+        throw new RuntimeException('Serviço inválido.', 400);
+    }
+
+    $duracao = (int) $servico['duracao_minutos'];
+
+    // Mantém o algoritmo de disponibilidade existente.
+    $horariosLivres = obterHorariosLivres(
+        $db,
+        (int) $agendamento['barbearia_id'],
+        $data,
+        $duracao,
+        (int) $agendamento['id']
+    );
+
+
+    $horarioNormalizado = $inicio->format('H:i');
+
+    if (!in_array($horarioNormalizado, $horariosLivres, true)) {
+        throw new RuntimeException(
+            'Este horário não está disponível.',
+            409
+        );
+    }
+
+    $fim = $inicio->modify("+{$duracao} minutes");
+
+    $stmt = $db->prepare("
+        UPDATE agendamentos
+        SET
+            data_agendamento = ?,
+            horario_inicio = ?,
+            horario_fim = ?,
+            notificacao_enviada = 0
+        WHERE id = ?
+          AND barbearia_id = ?
+          AND status = 'agendado'
+    ");
+
+    $stmt->execute([
+        $inicio->format('Y-m-d'),
+        $inicio->format('H:i:s'),
+        $fim->format('H:i:s'),
+        $id,
+        (int) $usuario['barbearia_id']
+    ]);
+
+    if ($stmt->rowCount() === 0) {
+
+        // Confirma se o agendamento continua existindo
+        // e se está no horário solicitado.
+        $verificar = $db->prepare("
+            SELECT id
+            FROM agendamentos
+            WHERE id = ?
+            AND barbearia_id = ?
+            AND status = 'agendado'
+            AND data_agendamento = ?
+            AND horario_inicio = ?
+            AND horario_fim = ?
+            LIMIT 1
+        ");
+
+        $verificar->execute([
+            $id,
+            (int) $usuario['barbearia_id'],
+            $inicio->format('Y-m-d'),
+            $inicio->format('H:i:s'),
+            $fim->format('H:i:s')
+        ]);
+
+        if (!$verificar->fetch()) {
+            throw new RuntimeException(
+                'Não foi possível atualizar o agendamento.',
+                409
+            );
+        }
+    }
 
     $db->commit();
-    echo json_encode(['sucesso' => true]);
 
-} catch (Exception $e) {
-    if (isset($db) && $db->inTransaction()) $db->rollBack();
-    http_response_code(400);
-    echo json_encode(['erro' => $e->getMessage()]);
+    echo json_encode([
+        'sucesso' => true,
+        'mensagem' => 'Agendamento atualizado com sucesso.'
+    ]);
+
+} catch (Throwable $e) {
+    if (isset($db) && $db->inTransaction()) {
+        $db->rollBack();
+    }
+
+    $codigo = (int) $e->getCode();
+
+    if (!in_array($codigo, [400, 403, 404, 409], true)) {
+        error_log('Erro no reagendamento: ' . $e->getMessage());
+        $codigo = 500;
+        $mensagem = 'Erro interno ao reagendar.';
+    } else {
+        $mensagem = $e->getMessage();
+    }
+
+    erroReagendamento($codigo, $mensagem);
 }

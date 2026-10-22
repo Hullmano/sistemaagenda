@@ -58,7 +58,6 @@ $dias_nome = [
             ?>
                 <div class="horario-card p-3 shadow-sm border border-secondary" style="--bs-border-opacity: .15;">
                     <form class="form-horario">
-                        <input type="hidden" name="barbearia_id" value="<?php echo $barbearia_id; ?>">
                         <input type="hidden" name="dia_semana" value="<?php echo $num_dia; ?>">
 
                         <div class="d-flex justify-content-between align-items-center pb-2 mb-3 border-bottom border-secondary" style="--bs-border-opacity: .1;">
@@ -108,9 +107,13 @@ $dias_nome = [
     </main>
 
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0"></script>
-
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+    const csrfToken = <?= json_encode(
+        gerarTokenCsrf(),
+        JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+    ) ?>;
+
     document.addEventListener("DOMContentLoaded", function() {
         // Controla a exibição dos campos ao ligar/desligar o switch
         document.querySelectorAll('.check-aberto').forEach(checkbox => {
@@ -127,13 +130,29 @@ $dias_nome = [
                     campos.classList.add('d-none');
                     label.textContent = 'Fechado';
                     
-                    const barbeariaId = card.querySelector('input[name="barbearia_id"]').value;
                     const diaSemana = card.querySelector('input[name="dia_semana"]').value;
                     
                     fetch('/agenda/api/salvar_horario.php', {
                         method: 'POST',
-                        body: JSON.stringify({ barbearia_id: barbeariaId, dia_semana: diaSemana, acao: 'fechar' }),
-                        headers: { 'Content-Type': 'application/json' }
+                        body: JSON.stringify({
+                            dia_semana: diaSemana,
+                            acao: 'fechar'
+                        }),
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': csrfToken
+                        }
+                    })
+                    .then(async r => {
+                        const res = await r.json();
+
+                        if (!r.ok || !res.sucesso) {
+                            throw new Error(res.erro || 'Erro ao fechar o dia.');
+                        }
+                    })
+                    .catch(err => {
+                        alert(err.message);
+                        window.location.reload();
                     });
                 }
             });
@@ -149,12 +168,22 @@ $dias_nome = [
                 fetch('/agenda/api/salvar_horario.php', {
                     method: 'POST',
                     body: JSON.stringify(formData),
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    }
                 })
-                .then(r => r.json())
-                .then(res => {
-                    if (res.sucesso) alert('Horário atualizado com sucesso!');
-                    else alert('Erro: ' + res.erro);
+                .then(async r => {
+                    const res = await r.json();
+
+                    if (!r.ok || !res.sucesso) {
+                        throw new Error(res.erro || 'Erro ao salvar horário.');
+                    }
+
+                    alert('Horário atualizado com sucesso!');
+                })
+                .catch(err => {
+                    alert(err.message);
                 });
             });
         });

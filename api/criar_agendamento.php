@@ -59,7 +59,24 @@ if ($whatsapp_limpo === null) {
 
 try {
     $db = \Database::getConnection();
-    $db->beginTransaction(); // Inicia transação para garantir consistência econômica/dados
+    $db->beginTransaction();
+
+    // Bloqueia a linha da barbearia durante a criação do agendamento.
+    // Outras reservas da mesma barbearia deverão aguardar
+    // a conclusão desta transação antes de verificar disponibilidade.
+    $stmt = $db->prepare("
+        SELECT id
+        FROM barbearias
+        WHERE id = ?
+        FOR UPDATE
+    ");
+
+    $stmt->execute([$barbearia_id]);
+
+    if (!$stmt->fetch()) {
+        throw new Exception('Barbearia não encontrada.');
+    }
+    // O bloqueio permanece ativo até COMMIT ou ROLLBACK.
 
     // 2. Busca dados do serviço (Preço e Duração)
     $stmt = $db->prepare("SELECT nome, duracao_minutos, preco FROM servicos WHERE id = ? AND barbearia_id = ? AND ativo = 1 LIMIT 1");
@@ -95,11 +112,27 @@ try {
         $cliente_id = $db->lastInsertId();
     }
 
-    // 6. Busca um barbeiro/usuário disponível (Definimos temporariamente o primeiro barbeiro do ID da barbearia)
-    $stmt = $db->prepare("SELECT id FROM usuarios WHERE barbearia_id = ? LIMIT 1");
+    // 6. Seleciona um barbeiro da barbearia.
+    // Temporariamente, enquanto não houver escolha do profissional pelo cliente.
+    $stmt = $db->prepare("
+        SELECT id
+        FROM usuarios
+        WHERE barbearia_id = ?
+        AND nivel = 'barbeiro'
+        ORDER BY id ASC
+        LIMIT 1
+    ");
+
     $stmt->execute([$barbearia_id]);
     $barbeiro = $stmt->fetch();
-    $usuario_id = $barbeiro ? $barbeiro['id'] : 1; // Fallback caso não ache
+
+    if (!$barbeiro) {
+        throw new Exception(
+            'Esta barbearia ainda não possui um barbeiro cadastrado.'
+        );
+    }
+
+    $usuario_id = (int) $barbeiro['id'];
 
     // 7. Faz o INSERT final do Agendamento
     $stmt = $db->prepare("

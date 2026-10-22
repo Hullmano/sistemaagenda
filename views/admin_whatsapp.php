@@ -3,7 +3,9 @@
 
 // 1. CONFIGURAÇÕES INTERNAS DA EVOLUTION API NO DROPLET
 $api_url_base = "http://127.0.0.1:8080";
-$config = require __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config.php';
+
+$config = agendaConfig();
 
 $api_key_global = $config['evolution_api_key']
     ?? getenv('EVOLUTION_API_KEY');
@@ -49,6 +51,16 @@ $status_conexao = checarStatusConexao($api_url_base, $instancia_nome, $api_key_g
 // 2. PROCESSAMENTO DO BOTÃO "GERAR QR CODE DE CONEXÃO" (POST)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gerar_qr'])) {
     
+    $usuario = exigirDono();
+
+    if (
+        (int) $usuario['barbearia_id'] !== (int) $barbearia_id ||
+        !validarTokenCsrf($_POST['csrf_token'] ?? null)
+    ) {
+        http_response_code(403);
+        exit('Operação não autorizada.');
+    }
+
     // Verifica o status atual antes de tentar criar
     $ch = curl_init("$api_url_base/instance/connectionState/$instancia_nome");
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -160,6 +172,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gerar_qr'])) {
                         <button type="submit" name="gerar_qr" class="btn btn-success fw-bold px-4 py-2 rounded-3 shadow w-100">
                             <i class="fa-solid fa-qrcode me-2"></i> Gerar QR Code de Conexão
                         </button>
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(gerarTokenCsrf(), ENT_QUOTES, 'UTF-8') ?>">
                     </form>
                 <?php endif; ?>
             <?php endif; ?>
@@ -181,6 +194,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gerar_qr'])) {
         </div>
     </main>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

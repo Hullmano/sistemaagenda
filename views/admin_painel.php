@@ -1,32 +1,76 @@
 <?php
 // views/admin_painel.php
 
+$usuario = exigirLogin();
 $db = \Database::getConnection();
 
-// 1. CAPTURA A DATA DINÂMICA: Se vier via URL (?data=2026-10-07) usa ela, senão usa HOJE
-$data_selecionada = isset($_GET['data']) ? trim($_GET['data']) : date('Y-m-d');
+// Data selecionada
+$data_selecionada = isset($_GET['data'])
+    ? trim($_GET['data'])
+    : date('Y-m-d');
 
-// 2. Consulta agendamentos filtrando pela DATA SELECIONADA na barbearia conectada
+// Valida o formato da data
+$data_valida = DateTimeImmutable::createFromFormat(
+    '!Y-m-d',
+    $data_selecionada
+);
+
+if (
+    !$data_valida ||
+    $data_valida->format('Y-m-d') !== $data_selecionada
+) {
+    $data_selecionada = date('Y-m-d');
+}
+
+// Parâmetros da consulta
+$parametros = [
+    (int) $barbearia_id,
+    $data_selecionada
+];
+
+$filtro_profissional = '';
+
+// Barbeiro visualiza apenas seus agendamentos
+if ($usuario['nivel'] === 'barbeiro') {
+    $filtro_profissional = ' AND a.usuario_id = ?';
+    $parametros[] = (int) $usuario['id'];
+}
+
 $stmt = $db->prepare("
-    SELECT a.id, a.servico_id, a.horario_inicio, c.nome AS cliente_nome, c.whatsapp AS cliente_whats, s.nome AS servico_nome, s.preco, a.status 
+    SELECT
+        a.id,
+        a.servico_id,
+        a.horario_inicio,
+        c.nome AS cliente_nome,
+        c.whatsapp AS cliente_whats,
+        s.nome AS servico_nome,
+        s.preco,
+        a.status
     FROM agendamentos a
     JOIN clientes c ON a.cliente_id = c.id
     JOIN servicos s ON a.servico_id = s.id
-    WHERE a.barbearia_id = ? AND a.data_agendamento = ?
+    WHERE a.barbearia_id = ?
+      AND a.data_agendamento = ?
+      $filtro_profissional
     ORDER BY a.horario_inicio ASC
 ");
-$stmt->execute([$barbearia_id, $data_selecionada]);
+
+$stmt->execute($parametros);
 $agendamentos_hoje = $stmt->fetchAll();
 
-// 3. Cálculos de faturamento baseados no dia selecionado
 $total_cortes = count($agendamentos_hoje);
+
 $faturamento_previsto = 0;
-foreach ($agendamentos_hoje as $ag) {
-    if ($ag['status'] !== 'cancelado') {
-        $faturamento_previsto += $ag['preco'];
+
+if ($usuario['nivel'] === 'dono') {
+    foreach ($agendamentos_hoje as $ag) {
+        if ($ag['status'] !== 'cancelado') {
+            $faturamento_previsto += (float) $ag['preco'];
+        }
     }
 }
 ?>
+
 
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -107,7 +151,34 @@ foreach ($agendamentos_hoje as $ag) {
             <span class="navbar-brand fw-extrabold m-0 text-white" style="letter-spacing: -0.5px;">
                 <i class="fa-solid fa-scissors text-warning me-2"></i><?php echo htmlspecialchars($barbearia_nome); ?>
             </span>
-            <span class="badge bg-dark border border-secondary text-secondary rounded-pill px-2 py-1" style="font-size: 0.7rem;">PRO</span>
+            <!-- Menu de Ações do Usuário -->
+            <div class="d-flex align-items-center gap-2">
+
+                <span class="badge bg-dark border border-secondary text-secondary rounded-pill px-2 py-1">
+                    <?= htmlspecialchars($usuario['nome'], ENT_QUOTES, 'UTF-8') ?>
+                </span>
+
+                <form method="post" action="/agenda/api/logout.php" class="m-0">
+
+                    <input
+                        type="hidden"
+                        name="csrf_token"
+                        value="<?= htmlspecialchars(gerarTokenCsrf(), ENT_QUOTES, 'UTF-8') ?>"
+                    >
+
+                    <button
+                        type="submit"
+                        class="btn btn-sm btn-outline-danger"
+                        title="Sair do sistema"
+                    >
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                        <span class="d-none d-sm-inline ms-1">Sair</span>
+                    </button>
+
+                </form>
+
+            </div>
+
         </div>
     </nav>
 
@@ -123,26 +194,28 @@ foreach ($agendamentos_hoje as $ag) {
                     <input type="date" id="filtro-data-painel" class="form-control input-custom py-2 fw-bold text-warning" value="<?php echo $data_selecionada; ?>" style="background-color: var(--bg-main) !important; border: 1px solid var(--border-color) !important; color: #FF9F43 !important; border-radius: 10px; font-size: 0.9rem;">
                 </div>
                 <div class="col-5 d-flex justify-content-end gap-1 mt-auto">
-                    <a href="/agenda/<?php echo $slug_filtrado; ?>/admin/servicos" class="btn btn-sm btn-dark border-secondary text-white rounded-3 p-2 text-decoration-none d-flex align-items-center" title="Catálogo de Serviços">
-                        <i class="fa-solid fa-tags"></i>
-                    </a>
-                    <a href="/agenda/<?php echo $slug_filtrado; ?>/admin/horarios" class="btn btn-sm btn-dark border-secondary text-white rounded-3 p-2 text-decoration-none d-flex align-items-center" title="Horários de Trabalho">
-                        <i class="fa-solid fa-clock"></i>
-                    </a>
+                    <?php if ($usuario['nivel'] === 'dono'): ?>
+                        <a href="/agenda/<?php echo $slug_filtrado; ?>/admin/servicos" class="btn btn-sm btn-dark border-secondary text-white rounded-3 p-2 text-decoration-none d-flex align-items-center" title="Catálogo de Serviços">
+                            <i class="fa-solid fa-tags"></i>
+                        </a>
+                        <a href="/agenda/<?php echo $slug_filtrado; ?>/admin/horarios" class="btn btn-sm btn-dark border-secondary text-white rounded-3 p-2 text-decoration-none d-flex align-items-center" title="Horários de Trabalho">
+                            <i class="fa-solid fa-clock"></i>
+                        </a>
+                    <?php endif; ?>
                     <button class="btn btn-sm btn-dark border-secondary text-white rounded-3 p-2" onclick="window.location.reload();" title="Atualizar Lista">
                         <i class="fa-solid fa-arrows-rotate"></i>
                     </button>
-
-                    <a href="/agenda/<?php echo $slug_filtrado; ?>/admin/whatsapp" class="btn btn-sm btn-dark border-secondary text-success rounded-3 p-2 text-decoration-none d-flex align-items-center" title="Configurar WhatsApp">
-                        <i class="fa-brands fa-whatsapp fs-6"></i>
-                    </a>
-
+                    <?php if ($usuario['nivel'] === 'dono'): ?>
+                        <a href="/agenda/<?php echo $slug_filtrado; ?>/admin/whatsapp" class="btn btn-sm btn-dark border-secondary text-success rounded-3 p-2 text-decoration-none d-flex align-items-center" title="Configurar WhatsApp">
+                            <i class="fa-brands fa-whatsapp fs-6"></i>
+                        </a>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
 
 
-        Dashboard Cards (Estilo FinTech)
+        <!-- Dashboard Cards (Estilo FinTech) -->
         <div class="row g-3 mb-4">
             <div class="col-6">
                 <div class="card-stats shadow-sm">
@@ -153,7 +226,9 @@ foreach ($agendamentos_hoje as $ag) {
             <div class="col-6">
                 <div class="card-stats shadow-sm">
                     <span class="text-secondary d-block mb-1 text-uppercase fw-bold" style="font-size: 0.65rem; letter-spacing: 0.5px;">Faturamento</span>
-                    <h3 class="fw-extrabold m-0 text-success">R$ <?php echo number_format($faturamento_previsto, 0, ',', '.'); ?></h3>
+                    <?php if ($usuario['nivel'] === 'dono'): ?>
+                        <h3 class="fw-extrabold m-0 text-success">R$ <?php echo number_format($faturamento_previsto, 0, ',', '.'); ?></h3>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -253,9 +328,14 @@ foreach ($agendamentos_hoje as $ag) {
 
     </main>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
+        const csrfToken = <?= json_encode(
+            gerarTokenCsrf(),
+            JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+        ) ?>;
+
         // --- SCRIPT DE NAVEGAÇÃO DE DATAS NO PAINEL ---
         const filtroDataPainel = document.getElementById('filtro-data-painel');
         filtroDataPainel.addEventListener('change', function() {
@@ -296,7 +376,10 @@ foreach ($agendamentos_hoje as $ag) {
                     // No dropet do fetch, usamos o caminho relativo correto para a API
                     fetch('/agenda/api/atualizar_status.php', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': csrfToken
+                        },
                         body: JSON.stringify({ id: agendamentoId, status: novoStatus })
                     })
                     .then(response => response.json())
@@ -348,7 +431,7 @@ foreach ($agendamentos_hoje as $ag) {
             const agendamentoId = campoReagendarId.value;
             const servicoId = campoReagendarServicoId.value;
             const dataSel = campoReagendarData.value;
-            
+
             // Captura o ID da barbearia direto do seu escopo PHP com segurança
             const bId = "<?php echo $barbearia_id; ?>";
 
@@ -357,7 +440,12 @@ foreach ($agendamentos_hoje as $ag) {
             horarioSelecionadoFinal = '';
 
             // URL montada de forma limpa sem escapes que quebram o interpretador
-            const urlApi = '/agenda/api/horarios_disponiveis.php?barbearia_id=' + bId + '&data=' + dataSel + '&servico_id=' + servicoId;
+
+            const urlApi = '/agenda/api/horarios_disponiveis.php'
+                + '?barbearia_id=' + encodeURIComponent(bId)
+                + '&data=' + encodeURIComponent(dataSel)
+                + '&servico_id=' + encodeURIComponent(servicoId)
+                + '&agendamento_id=' + encodeURIComponent(agendamentoId);
 
             fetch(urlApi)
                 .then(r => {
@@ -423,16 +511,26 @@ foreach ($agendamentos_hoje as $ag) {
             // Dispara a requisição POST via AJAX para o Droplet
             fetch('/agenda/api/reagendar.php', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
                 body: JSON.stringify({
                     id: agendamentoId,
                     data: dataDestino,
                     horario: horarioParaGravar
                 })
             })
-            .then(r => {
-                if (!r.ok) throw new Error('API retornou status de erro');
-                return r.json();
+            .then(async r => {
+                const resposta = await r.json();
+
+                if (!r.ok) {
+                    throw new Error(
+                        resposta.erro || 'Não foi possível reagendar.'
+                    );
+                }
+
+                return resposta;
             })
             .then(res => {
                 if (res.sucesso) {
@@ -446,7 +544,7 @@ foreach ($agendamentos_hoje as $ag) {
             })
             .catch(err => {
                 console.error('Erro ao reagendar:', err);
-                alert('Erro de comunicação. Verifique se o arquivo api/reagendar.php foi enviado para a nuvem.');
+                alert(err.message || 'Erro de comunicação com o servidor.');
                 btnConfirmarReagendamento.disabled = false;
                 btnConfirmarReagendamento.textContent = 'Confirmar Novo Horário';
             });

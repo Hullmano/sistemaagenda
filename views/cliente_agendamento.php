@@ -115,7 +115,7 @@ $servicos_reais = $stmt->fetchAll();
                     <input type="text" id="cliente-nome" placeholder="Seu Nome Completo" class="form-control input-custom" required>
                     <input type="tel" id="cliente-whatsapp" placeholder="DDD + telefone (ex.: 62999999999)" inputmode="tel" autocomplete="tel-national" class="form-control input-custom" required>
                     <div class="small text-secondary">🇧🇷 +55 sera acrescentado automaticamente.</div>
-                    <label class="small text-secondary"><input type="checkbox" id="lembrar-cliente"> Lembrar meus dados neste navegador</label>
+                    <label class="small text-secondary"><input type="checkbox" id="lembrar-cliente" checked> Lembrar meus dados neste navegador</label>
                     <button type="button" id="esquecer-cliente" class="btn btn-outline-secondary btn-sm">Nao sou eu / Limpar dados salvos</button>
                 </div>
             </div>
