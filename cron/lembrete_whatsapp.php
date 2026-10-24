@@ -73,6 +73,46 @@ try {
 
         $instancia = 'barber_' . $ag['barbearia_slug'];
 
+        // Verifica se o WhatsApp da barbearia está conectado.
+        $url_status = $api_url_base .
+            '/instance/connectionState/' .
+            rawurlencode($instancia);
+
+        $ch_status = curl_init($url_status);
+
+        curl_setopt_array($ch_status, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 3,
+            CURLOPT_TIMEOUT => 5,
+            CURLOPT_HTTPHEADER => [
+                'apikey: ' . $api_key
+            ]
+        ]);
+
+        $resposta_status = curl_exec($ch_status);
+        $http_status = curl_getinfo($ch_status, CURLINFO_HTTP_CODE);
+        $erro_status = curl_error($ch_status);
+
+        curl_close($ch_status);
+
+        $dados_status = json_decode($resposta_status ?: '', true);
+
+        $estado = $dados_status['instance']['state']
+            ?? $dados_status['status']
+            ?? '';
+
+        if (
+            $http_status !== 200 ||
+            !in_array($estado, ['open', 'connected'], true)
+        ) {
+            echo "Agendamento {$ag['id']}: WhatsApp não disponível "
+                . "na instância {$instancia}. "
+                . ($erro_status ?: "Estado: {$estado}")
+                . "\n";
+
+            continue;
+        }
+
         $horario = substr($ag['horario_inicio'], 0, 5);
 
         // Identificar o dia do atendimento
