@@ -49,6 +49,18 @@ if ($inicio_reserva <= (new DateTimeImmutable('now', $fuso))->modify('+15 minute
     exit;
 }
 
+// Permite agendamentos somente entre hoje e os próximos 29 dias.
+$hoje = new DateTimeImmutable('today', $fuso);
+$data_limite = $hoje->modify('+29 days');
+
+if ($inicio_reserva->format('Y-m-d') > $data_limite->format('Y-m-d')) {
+    http_response_code(400);
+    echo json_encode([
+        'erro' => 'Os agendamentos são permitidos somente para os próximos 30 dias, incluindo hoje.'
+    ]);
+    exit;
+}
+
 // Padrao unico para clientes brasileiros: +55 + DDD + numero.
 $whatsapp_limpo = normalizarWhatsappBR($whatsapp_cliente);
 if ($whatsapp_limpo === null) {
@@ -134,15 +146,18 @@ try {
 
     $usuario_id = (int) $barbeiro['id'];
 
-    // 7. Faz o INSERT final do Agendamento
+    // 7. Salva o agendamento com o nome informado pelo cliente
     $stmt = $db->prepare("
-        INSERT INTO agendamentos 
-        (barbearia_id, cliente_id, servico_id, usuario_id, data_agendamento, horario_inicio, horario_fim, status, notificacao_enviada) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'agendado', 0)
+        INSERT INTO agendamentos
+        (barbearia_id, cliente_id, nome_cliente, servico_id, usuario_id,
+        data_agendamento, horario_inicio, horario_fim, status, notificacao_enviada)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'agendado', 0)
     ");
+
     $stmt->execute([
         $barbearia_id,
         $cliente_id,
+        $nome_cliente,
         $servico_id,
         $usuario_id,
         $data_agendamento,

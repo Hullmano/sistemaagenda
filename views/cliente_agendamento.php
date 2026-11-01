@@ -37,6 +37,11 @@ $servicos_reais = $stmt->fetchAll();
         .card-custom { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; }
         .input-custom { background-color: var(--bg-main) !important; border: 1px solid var(--border-color) !important; color: white !important; border-radius: 10px; }
         .btn-horario { font-weight: bold; font-size: 0.75rem; padding: 8px; border-radius: 8px; }
+
+        /* Navegação por etapas do agendamento */
+        #etapa-data-horario {
+            display: none;
+        }
     </style>
 </head>
 <body class="pb-5">
@@ -60,107 +65,219 @@ $servicos_reais = $stmt->fetchAll();
         <div class="d-flex flex-column gap-3">
 
             <!-- PASSO 1: Escolha do Serviço -->
-            <div class="card-custom p-3 shadow-sm">
-                <div class="d-flex align-items-center gap-2 mb-3">
-                    <span class="badge bg-warning text-dark fw-bold">1</span>
-                    <h6 class="m-0 fw-bold text-white">Selecione o Serviço</h6>
-                </div>
-                
-                <div class="d-flex flex-column gap-2">
-                    <?php if(empty($servicos_reais)): ?>
-                        <p class="text-sm text-danger m-0">Nenhum serviço cadastrado nesta barbearia.</p>
-                    <?php else: ?>
-                        <?php foreach($servicos_reais as $index => $servico): ?>
-                            <label class="d-flex justify-content-between align-items-center p-3 border border-secondary rounded-3" style="--bs-border-opacity: .15; cursor: pointer; background: rgba(255,255,255,0.02);">
-                                <div class="d-flex align-items-center gap-3">
-                                    <input type="radio" name="servico" value="<?php echo $servico['id']; ?>" class="form-check-input seletor-servico m-0" <?php echo $index === 0 ? 'checked' : ''; ?>>
-                                    <div>
-                                        <span class="fw-bold text-white text-sm d-block"><?php echo htmlspecialchars($servico['nome']); ?></span>
-                                        <small class="text-secondary">⏱️ <?php echo $servico['duracao_minutos']; ?> min</small>
+            <section id="etapa-servico">
+                <div class="card-custom p-3 shadow-sm">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <span class="badge bg-warning text-dark fw-bold">1</span>
+                        <h6 class="m-0 fw-bold text-white">Selecione o Serviço</h6>
+                    </div>
+
+                    <div class="d-flex flex-column gap-2">
+                        <?php if(empty($servicos_reais)): ?>
+                            <p class="text-sm text-danger m-0">Nenhum serviço cadastrado nesta barbearia.</p>
+                        <?php else: ?>
+                            <?php foreach($servicos_reais as $index => $servico): ?>
+                                <label class="d-flex justify-content-between align-items-center p-3 border border-secondary rounded-3" style="--bs-border-opacity: .15; cursor: pointer; background: rgba(255,255,255,0.02);">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <input type="radio" name="servico" value="<?php echo $servico['id']; ?>" class="form-check-input seletor-servico m-0">
+                                        <div>
+                                            <span class="fw-bold text-white text-sm d-block"><?php echo htmlspecialchars($servico['nome']); ?></span>
+                                            <small class="text-secondary">⏱️ <?php echo $servico['duracao_minutos']; ?> min</small>
+                                        </div>
                                     </div>
-                                </div>
-                                <span class="fw-extrabold text-warning small">R$ <?php echo number_format($servico['preco'], 2, ',', '.'); ?></span>
-                            </label>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
+                                    <span class="fw-extrabold text-warning small">R$ <?php echo number_format($servico['preco'], 2, ',', '.'); ?></span>
+                                </label>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </div>
                 </div>
-            </div>
+            </section>
             <!-- PASSO 2: Escolha da Data -->
-            <div class="card-custom p-3 shadow-sm">
-                <div class="d-flex align-items-center gap-2 mb-3">
-                    <span class="badge bg-warning text-dark fw-bold">2</span>
-                    <h6 class="m-0 fw-bold text-white">Escolha o Dia</h6>
+            <section id="etapa-data-horario">
+                <div class="mb-3">
+                    <button type="button"
+                            id="btn-voltar-servico"
+                            class="btn btn-outline-secondary btn-sm">
+                        <i class="fa-solid fa-arrow-left me-1"></i>
+                        Voltar aos serviços
+                    </button>
                 </div>
-                <input type="date" id="campo-data" class="form-control input-custom" value="<?php echo date('Y-m-d'); ?>" min="<?php echo date('Y-m-d'); ?>">
-            </div>
+                <div class="card-custom p-3 shadow-sm">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <span class="badge bg-warning text-dark fw-bold">2</span>
+                        <h6 class="m-0 fw-bold text-white">Escolha o Dia</h6>
+                    </div>
+                    <!-- Calendário compacto -->
+                    <div id="calendario-compacto" class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <button type="button"
+                                    id="btn-semana-anterior"
+                                    class="btn btn-outline-secondary btn-sm">
+                                <i class="fa-solid fa-chevron-left"></i>
+                            </button>
 
-            <!-- PASSO 3: Horários Livres -->
-            <div class="card-custom p-3 shadow-sm">
-                <div class="d-flex align-items-center gap-2 mb-3">
-                    <span class="badge bg-warning text-dark fw-bold">3</span>
-                    <h6 class="m-0 fw-bold text-white">Horários Disponíveis</h6>
-                </div>
-                <div id="container-horarios" class="row row-cols-4 g-2 px-2">
-                    <p class="text-xs text-secondary text-center w-100 py-2 m-0">Buscando horários...</p>
-                </div>
-            </div>
+                            <span id="periodo-calendario"
+                                class="small fw-bold text-white">
+                                Selecione uma data
+                            </span>
 
-            <!-- PASSO 4: Identificação do Cliente -->
-            <div class="card-custom p-3 shadow-sm">
-                <div class="d-flex align-items-center gap-2 mb-3">
-                    <span class="badge bg-warning text-dark fw-bold">4</span>
-                    <h6 class="m-0 fw-bold text-white">Seus Dados</h6>
-                </div>
-                <div class="d-flex flex-column gap-2">
-                    <input type="text" id="cliente-nome" placeholder="Seu Nome Completo" class="form-control input-custom" required>
-                    <input type="tel" id="cliente-whatsapp" placeholder="DDD + telefone (ex.: 62999999999)" inputmode="tel" autocomplete="tel-national" class="form-control input-custom" required>
-                    <div class="small text-secondary">🇧🇷 +55 sera acrescentado automaticamente.</div>
-                    <label class="small text-secondary"><input type="checkbox" id="lembrar-cliente" checked> Lembrar meus dados neste navegador</label>
-                    <button type="button" id="esquecer-cliente" class="btn btn-outline-secondary btn-sm">Nao sou eu / Limpar dados salvos</button>
-                </div>
-            </div>
+                            <button type="button"
+                                    id="btn-proxima-semana"
+                                    class="btn btn-outline-secondary btn-sm">
+                                <i class="fa-solid fa-chevron-right"></i>
+                            </button>
+                        </div>
 
-            <div class="card-custom p-3">
-                <p class="small text-secondary">Se seu cadastro anterior tem algum dado incorreto, solicite a correção.</p>
-                <button type="button" class="btn btn-outline-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalCorrecao">Solicitar correção dos meus dados</button>
-            </div>
-            <!-- Botão Confirmar -->
-            <div class="pt-2">
-                <button id="btn-finalizar" class="btn btn-warning w-100 py-3 fw-bold text-dark text-uppercase shadow shadow-lg" style="border-radius: 12px; letter-spacing: 0.5px;">
-                    ⚡ Confirmar Agendamento
-                </button>
-            </div>
+                        <div id="dias-calendario"
+                            class="row row-cols-5 g-2 text-center">
+                        </div>
+                    </div>
 
+                    <!-- Mantém a data selecionada para o sistema atual -->
+                    <input type="hidden" id="campo-data" value="<?php echo date('Y-m-d'); ?>">
+                </div>
+
+                <!-- PASSO 3: Horários Livres -->
+                <div class="card-custom p-3 shadow-sm">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <span class="badge bg-warning text-dark fw-bold">2</span>
+                        <h6 class="m-0 fw-bold text-white">Horários Disponíveis</h6>
+                    </div>
+                    <div id="container-horarios" class="row row-cols-4 g-2 px-2">
+                        <p class="text-xs text-secondary text-center w-100 py-2 m-0">Buscando horários...</p>
+                    </div>
+                </div>
+
+                <!-- PASSO 4: Identificação do Cliente -->
+                <div class="card-custom p-3 shadow-sm">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <span class="badge bg-warning text-dark fw-bold">3</span>
+                        <h6 class="m-0 fw-bold text-white">Seus Dados</h6>
+                    </div>
+                    <div class="d-flex flex-column gap-2">
+                        <input type="text" id="cliente-nome" placeholder="Seu Nome Completo" class="form-control input-custom" required>
+                        <input type="tel" id="cliente-whatsapp" placeholder="DDD + telefone (ex.: 62999999999)" inputmode="tel" autocomplete="tel-national" class="form-control input-custom" required>
+                        <div class="small text-secondary">🇧🇷 +55 sera acrescentado automaticamente.</div>
+                        <label class="small text-secondary"><input type="checkbox" id="lembrar-cliente" checked> Lembrar meus dados neste navegador</label>
+                        <button type="button" id="esquecer-cliente" class="btn btn-outline-secondary btn-sm">Nao sou eu / Limpar dados salvos</button>
+                    </div>
+                </div>
+
+                <!-- Botão Confirmar -->
+                <div class="pt-2">
+                    <button id="btn-finalizar" class="btn btn-warning w-100 py-3 fw-bold text-dark text-uppercase shadow shadow-lg" style="border-radius: 12px; letter-spacing: 0.5px;">
+                        ⚡ Confirmar Agendamento
+                    </button>
+                </div>
+            </section>
         </div>
     </main>
 
-    <div class="modal fade" id="modalCorrecao" tabindex="-1" aria-labelledby="tituloCorrecao" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="background:#151B2C;color:white">
-        <form id="form-correcao">
-          <div class="modal-header"><h5 class="modal-title" id="tituloCorrecao">Solicitar correção cadastral</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button></div>
-          <div class="modal-body">
-            <p class="small text-secondary">Informe os dados. A alteração dependerá de análise da barbearia.</p>
-            <label for="correcao-atual" class="form-label">WhatsApp do cadastro atual</label>
-            <input id="correcao-atual" type="tel" class="form-control input-custom mb-3" maxlength="20" required>
-            <label for="correcao-nome" class="form-label">Nome correto</label>
-            <input id="correcao-nome" class="form-control input-custom mb-3" maxlength="120" required>
-            <label for="correcao-novo" class="form-label">WhatsApp correto</label>
-            <input id="correcao-novo" type="tel" class="form-control input-custom mb-3" maxlength="20" required>
-            <label for="correcao-obs" class="form-label">Observação (opcional)</label>
-            <textarea id="correcao-obs" class="form-control input-custom mb-3" maxlength="500"></textarea>
-            <p id="correcao-retorno" class="small" role="status" aria-live="polite"></p>
-          </div>
-          <div class="modal-footer"><button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Cancelar</button><button type="submit" id="btn-correcao" class="btn btn-warning">Enviar solicitação</button></div>
-        </form>
-      </div></div>
-    </div>
     <!-- Bootstrap 5 JavaScript via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <!-- Motor AJAX Otimizado para a subpasta /agenda -->
     <script>
-    document.addEventListener("DOMContentLoaded", function() {
+        document.addEventListener("DOMContentLoaded", function() {
+                document.getElementById('btn-voltar-servico').addEventListener('click', function() {
+            document.getElementById('etapa-data-horario').style.display = 'none';
+            document.getElementById('etapa-servico').style.display = 'block';
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
         const campoData = document.getElementById('campo-data');
+
+        // Calendário compacto: 7 dias por página, até 30 dias incluindo hoje.
+        const diasCalendario = document.getElementById('dias-calendario');
+        const periodoCalendario = document.getElementById('periodo-calendario');
+        const btnAnterior = document.getElementById('btn-semana-anterior');
+        const btnProxima = document.getElementById('btn-proxima-semana');
+
+        const LIMITE_DIAS = 30;
+        let inicioPagina = 0;
+
+        const hoje = new Date();
+        hoje.setHours(12, 0, 0, 0);
+
+        const nomesDias = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
+
+        function dataDoIndice(indice) {
+            const data = new Date(hoje);
+            data.setDate(hoje.getDate() + indice);
+            return data;
+        }
+
+        function formatarDataLocal(data) {
+            const ano = data.getFullYear();
+            const mes = String(data.getMonth() + 1).padStart(2, '0');
+            const dia = String(data.getDate()).padStart(2, '0');
+
+            return `${ano}-${mes}-${dia}`;
+        }
+
+        function renderizarCalendario() {
+            diasCalendario.innerHTML = '';
+
+            const ultimoIndice = Math.min(inicioPagina + 4, LIMITE_DIAS - 1);
+
+            for (let i = inicioPagina; i <= ultimoIndice; i++) {
+                const data = dataDoIndice(i);
+                const valor = formatarDataLocal(data);
+
+                const coluna = document.createElement('div');
+                coluna.className = 'col';
+
+                const botao = document.createElement('button');
+                botao.type = 'button';
+                botao.className = 'btn btn-outline-light w-100 p-1';
+                botao.style.fontSize = '0.7rem';
+
+                botao.innerHTML = `
+                    <small class="d-block">${nomesDias[data.getDay()]}</small>
+                    <strong class="d-block">${data.getDate()}</strong>
+                    <small>${String(data.getMonth() + 1).padStart(2, '0')}</small>
+                `;
+
+                if (campoData.value === valor) {
+                    botao.classList.remove('btn-outline-light');
+                    botao.classList.add('btn-warning', 'text-dark');
+                }
+
+                botao.addEventListener('click', function() {
+                    campoData.value = valor;
+                    renderizarCalendario();
+                    carregarHorarios();
+                });
+
+                coluna.appendChild(botao);
+                diasCalendario.appendChild(coluna);
+            }
+
+            const primeira = dataDoIndice(inicioPagina);
+            const ultima = dataDoIndice(ultimoIndice);
+
+            periodoCalendario.textContent =
+                `${primeira.toLocaleDateString('pt-BR')} a ${ultima.toLocaleDateString('pt-BR')}`;
+
+            btnAnterior.disabled = inicioPagina === 0;
+            btnProxima.disabled = inicioPagina + 5 >= LIMITE_DIAS;
+        }
+
+        btnAnterior.addEventListener('click', function() {
+            inicioPagina = Math.max(0, inicioPagina - 5);
+            renderizarCalendario();
+        });
+
+        btnProxima.addEventListener('click', function() {
+            if (inicioPagina + 5 < LIMITE_DIAS) {
+                inicioPagina += 5;
+                renderizarCalendario();
+            }
+        });
+
+        campoData.value = formatarDataLocal(hoje);
+        renderizarCalendario();
+
         const containerHorarios = document.getElementById('container-horarios');
         const barbeariaId = document.getElementById('barbearia_id').value;
         const btnFinalizar = document.getElementById('btn-finalizar');
@@ -234,9 +351,15 @@ $servicos_reais = $stmt->fetchAll();
 
         campoData.addEventListener('change', carregarHorarios);
         document.querySelectorAll('.seletor-servico').forEach(radio => {
-            radio.addEventListener('change', carregarHorarios);
-        });
+            radio.addEventListener('change', function() {
+                document.getElementById('etapa-servico').style.display = 'none';
+                document.getElementById('etapa-data-horario').style.display = 'block';
 
+                carregarHorarios();
+
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        });
         // Evento de Gravação do Agendamento Final do Cliente
         btnFinalizar.addEventListener('click', function() {
             const servicoSelecionado = document.querySelector('input[name="servico"]:checked')?.value;
@@ -294,33 +417,6 @@ $servicos_reais = $stmt->fetchAll();
             });
         });
 
-        document.getElementById('form-correcao').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const btn = document.getElementById('btn-correcao');
-            const aviso = document.getElementById('correcao-retorno');
-            btn.disabled = true;
-            aviso.textContent = 'Enviando...';
-            try {
-                const r = await fetch('/agenda/api/solicitar_correcao_cadastro.php', {
-                    method: 'POST',
-                    headers: {'Content-Type':'application/json'},
-                    body: JSON.stringify({
-                        barbearia_id: barbeariaId,
-                        whatsapp_atual: document.getElementById('correcao-atual').value,
-                        nome_corrigido: document.getElementById('correcao-nome').value,
-                        whatsapp_corrigido: document.getElementById('correcao-novo').value,
-                        observacao: document.getElementById('correcao-obs').value
-                    })
-                });
-                const dados = await r.json();
-                aviso.textContent = dados.mensagem || dados.erro || 'Falha no envio.';
-                aviso.className = 'small ' + (dados.sucesso ? 'text-success' : 'text-danger');
-                if (dados.sucesso) e.target.reset();
-            } catch (err) {
-                aviso.textContent = 'Falha de comunicação. Tente novamente.';
-                aviso.className = 'small text-danger';
-            } finally { btn.disabled = false; }
-        });
         carregarHorarios();
     });
     </script>

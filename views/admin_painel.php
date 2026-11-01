@@ -41,7 +41,7 @@ $stmt = $db->prepare("
         a.id,
         a.servico_id,
         a.horario_inicio,
-        c.nome AS cliente_nome,
+        COALESCE(NULLIF(a.nome_cliente, ''), c.nome) AS cliente_nome,
         c.whatsapp AS cliente_whats,
         s.nome AS servico_nome,
         s.preco,

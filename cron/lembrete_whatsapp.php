@@ -26,7 +26,7 @@ try {
     $sql = "
         SELECT
             a.id,
-            c.nome AS cliente_nome,
+            COALESCE(NULLIF(a.nome_cliente, ''), c.nome) AS cliente_nome,
             c.whatsapp AS cliente_whats,
             b.nome AS barbearia_nome,
             b.slug AS barbearia_slug,
