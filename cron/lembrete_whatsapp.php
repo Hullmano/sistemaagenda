@@ -6,11 +6,32 @@ set_time_limit(120);
 
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../helpers/agenda.php';
+require_once __DIR__ . '/../helpers/token_consulta.php';
+require_once __DIR__ . '/../config.php';
+
+$config = agendaConfig();
+
+// Modo de diagnóstico: não envia mensagens reais.
+$whatsapp_diagnostico = filter_var(
+    $config['whatsapp_diagnostico'] ?? true,
+    FILTER_VALIDATE_BOOLEAN
+);
+
+$appUrl = rtrim($config['app_url'] ?? '', '/');
+
+if (
+    !filter_var($appUrl, FILTER_VALIDATE_URL) ||
+    !in_array(parse_url($appUrl, PHP_URL_SCHEME), ['http', 'https'], true)
+) {
+    throw new RuntimeException(
+        'Endereço público do sistema não configurado.'
+    );
+}
 
 $api_url_base = 'http://127.0.0.1:8080';
 $api_key = getenv('EVOLUTION_API_KEY');
 
-if (!$api_key) {
+if (!$whatsapp_diagnostico && !$api_key) {
     exit("ERRO: EVOLUTION_API_KEY não configurada.\n");
 }
 
@@ -19,39 +40,61 @@ try {
 
     // Enviar lembrete para qualquer agendamento futuro nos proximos 60 minutos.
     // Inclui agendamentos criados com apenas 15 minutos de antecedencia.
-    $agora = new DateTimeImmutable('now');
-    $inicio = $agora;
-    $fim = $agora->modify('+60 minutes');
-    
+    // Horário de referência para os lembretes configuráveis.
+    $agora = new DateTimeImmutable(
+        'now',
+        new DateTimeZone('America/Sao_Paulo')
+    );
+
     $sql = "
         SELECT
             a.id,
+            a.token_consulta_hash,
+            a.token_consulta_cifrado,
             COALESCE(NULLIF(a.nome_cliente, ''), c.nome) AS cliente_nome,
             c.whatsapp AS cliente_whats,
             b.nome AS barbearia_nome,
             b.slug AS barbearia_slug,
+            b.antecedencia_cancelamento_minutos,
             a.data_agendamento,
             a.horario_inicio
         FROM agendamentos a
-        JOIN clientes c ON a.cliente_id = c.id
-        JOIN barbearias b ON a.barbearia_id = b.id
-        WHERE TIMESTAMP(
-            a.data_agendamento,
-            a.horario_inicio
-        ) >= ?
+        JOIN clientes c
+            ON c.id = a.cliente_id
+        AND c.barbearia_id = a.barbearia_id
+        JOIN barbearias b
+            ON b.id = a.barbearia_id
+        WHERE a.status = 'agendado'
+        AND a.notificacao_enviada = 0
+        AND a.notificacao_tentada_em IS NULL
+        AND b.ativo = 1
+
+        -- O horário programado do lembrete já chegou.
         AND TIMESTAMP(
             a.data_agendamento,
             a.horario_inicio
-        ) < ?
-        AND a.status = 'agendado'
-        AND a.notificacao_enviada = 0
+        ) <= DATE_ADD(
+            ?,
+            INTERVAL (
+                b.antecedencia_cancelamento_minutos + 5
+            ) MINUTE
+        )
+
+        -- O prazo de cancelamento ainda não terminou.
+        AND TIMESTAMP(
+            a.data_agendamento,
+            a.horario_inicio
+        ) > DATE_ADD(
+            ?,
+            INTERVAL b.antecedencia_cancelamento_minutos MINUTE
+        )
     ";
 
     $stmt = $db->prepare($sql);
 
     $stmt->execute([
-        $inicio->format('Y-m-d H:i:s'),
-        $fim->format('Y-m-d H:i:s')
+        $agora->format('Y-m-d H:i:s'),
+        $agora->format('Y-m-d H:i:s')
     ]);
 
     $agendamentos = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -62,6 +105,39 @@ try {
     }
 
     foreach ($agendamentos as $ag) {
+
+        // Recupera o token necessário para montar o link individual.
+        $tokenRecuperado = null;
+
+        if (!empty($ag['token_consulta_cifrado'])) {
+            $tokenRecuperado = decifrarTokenConsulta(
+                $ag['token_consulta_cifrado']
+            );
+        }
+
+        // Confirma que o token recuperado corresponde ao hash salvo.
+        $tokenValido = (
+            $tokenRecuperado !== null &&
+            !empty($ag['token_consulta_hash']) &&
+            hash_equals(
+                $ag['token_consulta_hash'],
+                hash('sha256', $tokenRecuperado)
+            )
+        );
+
+        if (!$tokenValido) {
+            // Agendamentos antigos podem não possuir token cifrado.
+            // Não registrar tokens ou links individuais nos logs.
+            echo "Agendamento {$ag['id']}: link individual indisponível.\n";
+            continue;
+        }
+
+        // Monta o link individual de consulta e cancelamento.
+        $linkConsulta = $appUrl
+            . '/agenda/'
+            . rawurlencode($ag['barbearia_slug'])
+            . '/agendamento/'
+            . $tokenRecuperado;
 
         require_once __DIR__ . '/../helpers/telefone.php';
         $numero = normalizarWhatsappBR($ag['cliente_whats']);
@@ -74,6 +150,9 @@ try {
         $instancia = 'barber_' . $ag['barbearia_slug'];
 
         // Verifica se o WhatsApp da barbearia está conectado.
+
+        if (!$whatsapp_diagnostico) {
+
         $url_status = $api_url_base .
             '/instance/connectionState/' .
             rawurlencode($instancia);
@@ -112,8 +191,29 @@ try {
 
             continue;
         }
-
+        }
         $horario = substr($ag['horario_inicio'], 0, 5);
+
+        // Calcula o prazo de cancelamento da barbearia.
+        $antecedencia = (int) $ag[
+            'antecedencia_cancelamento_minutos'
+        ];
+
+        if (!in_array($antecedencia, [30, 60], true)) {
+            $antecedencia = 30;
+        }
+
+        $dataHoraAtendimento = new DateTimeImmutable(
+            $ag['data_agendamento'] . ' ' . $ag['horario_inicio'],
+            new DateTimeZone('America/Sao_Paulo')
+        );
+
+        $limiteCancelamento = $dataHoraAtendimento->modify(
+            '-' . $antecedencia . ' minutes'
+        );
+
+        $horarioLimite = $limiteCancelamento->format('H:i');
+
 
         // Identificar o dia do atendimento
         $dataAtendimento = new DateTimeImmutable(
@@ -136,11 +236,32 @@ try {
         // Montar mensagem do WhatsApp
         $mensagem =
             "Olá, *{$ag['cliente_nome']}*! ✂️\n\n" .
-            "Passando para lembrar que seu horário na " .
-            "*{$ag['barbearia_nome']}* está confirmado " .
-            "{$diaAtendimento} às *{$horario}*.\n\n" .
-            "Se precisar reagendar ou cancelar, " .
-            "entre em contato com a barbearia.";
+            "Lembrando do seu horário na *{$ag['barbearia_nome']}*:\n\n" .
+            "📅 {$diaAtendimento} às *{$horario}*\n" .
+            "⏰ Cancelamento até *{$horarioLimite}*.\n\n" .
+            "🔗 Consulte ou cancele:\n" .
+            $linkConsulta;
+
+        // Confirma novamente que o agendamento continua ativo.
+        $stmtStatus = $db->prepare("
+            SELECT status, notificacao_enviada
+            FROM agendamentos
+            WHERE id = ?
+            LIMIT 1
+        ");
+
+        $stmtStatus->execute([(int)$ag['id']]);
+
+        $statusAtual = $stmtStatus->fetch(PDO::FETCH_ASSOC);
+
+        if (
+            !$statusAtual ||
+            $statusAtual['status'] !== 'agendado' ||
+            (int)$statusAtual['notificacao_enviada'] === 1
+        ) {
+            echo "Agendamento {$ag['id']}: lembrete ignorado.\n";
+            continue;
+        }
 
         $payload = json_encode([
             'number' => $numero,
@@ -164,6 +285,38 @@ try {
                 'apikey: ' . $api_key
             ]
         ]);
+
+        // Modo de diagnóstico: não altera o banco e não envia WhatsApp.
+if ($whatsapp_diagnostico) {
+    curl_close($ch);
+
+    echo "DIAGNOSTICO: agendamento {$ag['id']}.\n";
+    echo "Lembrete seria enviado. Nenhum dado alterado.\n";
+
+    continue;
+}
+
+        // Reserva atomicamente a tentativa antes do envio.
+        // Impede que outra execução envie o mesmo lembrete.
+        $stmtTentativa = $db->prepare("
+            UPDATE agendamentos
+            SET notificacao_tentada_em = NOW()
+            WHERE id = ?
+            AND status = 'agendado'
+            AND notificacao_enviada = 0
+            AND notificacao_tentada_em IS NULL
+        ");
+
+        $stmtTentativa->execute([(int)$ag['id']]);
+
+        if ($stmtTentativa->rowCount() !== 1) {
+            curl_close($ch);
+
+            echo "Agendamento {$ag['id']}: "
+                . "lembrete ignorado ou ja reservado.\n";
+
+            continue;
+        }
 
         $resposta = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -190,9 +343,11 @@ try {
 
         } else {
 
-            echo "ERRO no agendamento {$ag['id']}\n";
+            echo "ATENCAO: envio nao confirmado para o agendamento {$ag['id']}.\n";
             echo "HTTP: {$http_code}\n";
-            echo "Detalhes: " . ($erro ?: $resposta) . "\n";
+            echo "Detalhes: " . ($erro ?: $resposta ?: 'Sem resposta da API') . "\n";
+            echo "Tentativa registrada no banco. Reenvio automatico bloqueado.\n";
+            echo "Verificar o resultado na Evolution API antes de liberar nova tentativa.\n";
         }
     }
 

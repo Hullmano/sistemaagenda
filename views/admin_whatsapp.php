@@ -10,18 +10,41 @@ $config = agendaConfig();
 $api_key_global = $config['evolution_api_key']
     ?? getenv('EVOLUTION_API_KEY');
 
+// A página administrativa pode ser aberta mesmo
+// quando a Evolution API não estiver configurada.
 if (!$api_key_global) {
-    throw new RuntimeException(
-        'Chave da Evolution API não configurada.'
-    );
+    $api_key_global = null;
 }
 
+
 // Ajuste automático do nome da instância utilizando o slug da barbearia
-$instancia_nome = isset($slug_filtrado) && !empty($slug_filtrado) ? "barber_" . $slug_filtrado : "barber_do_tiao"; 
+$instancia_nome = isset($slug_filtrado) && !empty($slug_filtrado) ? "barber_" . $slug_filtrado : "barber_do_tiao";
 
 $status_conexao = "DESCONECTADO";
 $qrcode_imagem = "";
 $erro_sistema = "";
+
+// Configuração de antecedência dos lembretes e cancelamentos.
+// O lembrete será enviado 5 minutos antes do limite de cancelamento.
+$stmt = $db->prepare("
+    SELECT antecedencia_cancelamento_minutos
+    FROM barbearias
+    WHERE id = ?
+    LIMIT 1
+");
+
+$stmt->execute([
+    (int)$barbearia_id
+]);
+
+$antecedenciaCancelamento = (int)$stmt->fetchColumn();
+
+// Valores permitidos nesta primeira versão.
+if (!in_array($antecedenciaCancelamento, [30, 60], true)) {
+    $antecedenciaCancelamento = 30;
+}
+
+$antecedenciaLembrete = $antecedenciaCancelamento + 5;
 
 // FUNÇÃO AUXILIAR CORRIGIDA PARA V2: Verifica o real estado no endpoint connectionState
 function checarStatusConexao($url, $instance, $key) {
@@ -35,7 +58,7 @@ function checarStatusConexao($url, $instance, $key) {
 
     if ($http_code === 200 && $response) {
         $dados = json_decode($response, true);
-        
+
         // Na v2 o retorno de sucesso real traz ['instance']['state'] = 'open'
         $estado_real = $dados['instance']['state'] ?? $dados['status'] ?? '';
         if ($estado_real === 'open' || $estado_real === 'connected') {
@@ -46,11 +69,23 @@ function checarStatusConexao($url, $instance, $key) {
 }
 
 // Inicializa a página checando se o robô já está ativo no WhatsApp
-$status_conexao = checarStatusConexao($api_url_base, $instancia_nome, $api_key_global);
+
+$status_conexao = $api_key_global
+    ? checarStatusConexao(
+        $api_url_base,
+        $instancia_nome,
+        $api_key_global
+    )
+    : 'DESCONECTADO';
 
 // 2. PROCESSAMENTO DO BOTÃO "GERAR QR CODE DE CONEXÃO" (POST)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gerar_qr'])) {
-    
+
+    if (!$api_key_global) {
+        http_response_code(503);
+        exit('Evolution API não configurada neste ambiente.');
+    }
+
     $usuario = exigirDono();
 
     if (
@@ -80,13 +115,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gerar_qr'])) {
             "qrcode" => true
         ]));
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Content-Type: application/json", 
+            "Content-Type: application/json",
             "X-API-Key: $api_key_global",
             "apikey: $api_key_global"
         ]);
         curl_exec($ch);
         curl_close($ch);
-        
+
         // Aguarda 2 segundos para o banco MySQL processar as tabelas internas da nova barbearia
         sleep(2);
     }
@@ -122,7 +157,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gerar_qr'])) {
     <!-- Links Homologados via cdnjs -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-    
+
     <style>
         :root { --bg-main: #0B0F19; --bg-card: #151B2C; --border-color: #222B45; --text-primary: #F4F6F9; --text-secondary: #8F9BB3; }
         body { background-color: var(--bg-main); color: var(--text-primary); font-family: 'Plus Jakarta Sans', sans-serif; }
@@ -146,13 +181,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gerar_qr'])) {
     <!-- Conteúdo -->
     <main class="container py-4" style="max-width: 480px;">
         <div class="wa-card p-4 shadow-sm text-center">
-            
+
             <div class="mb-4">
                 <i class="fa-brands fa-whatsapp display-1 <?php echo $status_conexao === 'CONECTADO' ? 'text-success' : 'text-secondary'; ?>"></i>
             </div>
 
             <h5 class="fw-bold mb-1">Status do Robô de Lembretes</h5>
-            
+
             <?php if($status_conexao === 'CONECTADO'): ?>
                 <div class="badge bg-success-subtle text-success fs-6 rounded-pill px-3 py-2 mt-2 border border-success border-opacity-25 mb-4">
                     <i class="fa-solid fa-circle-check me-1"></i> SISTEMA ATIVO
@@ -162,7 +197,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gerar_qr'])) {
                 <div class="badge bg-danger-subtle text-danger fs-6 rounded-pill px-3 py-2 mt-2 border border-danger border-opacity-25 mb-4">
                     <i class="fa-solid fa-circle-exclamation me-1"></i> DESCONECTADO
                 </div>
-                
+
                 <!-- Só exibe a descrição inicial se o QR Code ainda não estiver na tela -->
                 <?php if(empty($qrcode_imagem)): ?>
                     <p class="text-secondary small mb-4">Para ativar os envios automatizados de mensagens, você precisa vincular o WhatsApp da sua barbearia ao nosso sistema.</p>
@@ -184,7 +219,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gerar_qr'])) {
                     <img src="<?php echo $qrcode_imagem; ?>" alt="QR Code Evolution API" class="img-fluid rounded">
                     <small class="text-muted d-block mt-2 font-monospace" style="font-size: 0.65rem;">Aguardando pareamento...</small>
                 </div>
-                
+
                 <!-- CORREÇÃO: Botão modificado para recarregar enviando uma ação post limpa para o PHP atualizar o robô para ATIVO se o celular já leu -->
                 <a href="/agenda/<?php echo $slug_filtrado; ?>/admin/whatsapp" class="btn btn-success fw-bold mt-3 w-100 py-2 rounded-3 shadow">
                     <i class="fa-solid fa-circle-check me-1"></i> Já escaneei, atualizar status
@@ -192,8 +227,175 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gerar_qr'])) {
             <?php endif; ?>
 
         </div>
+
+        <!-- Configurações de lembretes e cancelamentos -->
+        <div class="wa-card p-4 shadow-sm mt-4">
+
+            <h5 class="fw-bold mb-3">
+                <i class="fa-solid fa-clock text-warning me-2"></i>
+                Lembretes e cancelamentos
+            </h5>
+
+            <p class="text-secondary small">
+                Escolha a antecedência mínima para o cliente cancelar
+                um agendamento. O lembrete será programado para
+                5 minutos antes desse limite.
+            </p>
+
+            <div class="mb-3">
+                <label for="antecedenciaCancelamento"
+                    class="form-label fw-bold">
+                    Antecedência para cancelamento
+                </label>
+
+                <select
+                    id="antecedenciaCancelamento"
+                    class="form-select bg-dark text-white border-secondary"
+                >
+                    <option value="30"
+                        <?= $antecedenciaCancelamento === 30 ? 'selected' : '' ?>>
+                        30 minutos
+                    </option>
+
+                    <option value="60"
+                        <?= $antecedenciaCancelamento === 60 ? 'selected' : '' ?>>
+                        60 minutos
+                    </option>
+                </select>
+            </div>
+
+            <div class="p-3 rounded-3 border border-secondary mb-3">
+                <div class="d-flex justify-content-between gap-2 mb-2">
+                    <span class="text-secondary small">
+                        Envio programado do lembrete
+                    </span>
+                    <strong id="previewLembrete">
+                        <?= $antecedenciaLembrete ?> minutos antes
+                    </strong>
+                </div>
+
+                <div class="d-flex justify-content-between gap-2">
+                    <span class="text-secondary small">
+                        Limite para cancelamento
+                    </span>
+                    <strong id="previewCancelamento">
+                        <?= $antecedenciaCancelamento ?> minutos antes
+                    </strong>
+                </div>
+            </div>
+
+            <button
+                type="button"
+                id="btnSalvarAntecedencia"
+                class="btn btn-warning w-100 fw-bold"
+                disabled
+            >
+                Salvar configuração
+            </button>
+
+            <div id="mensagemAntecedencia"
+                class="alert alert-danger mt-3 d-none"
+                role="alert"></div>
+
+        </div>
+
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+
+        const seletor = document.getElementById('antecedenciaCancelamento');
+        const previewLembrete = document.getElementById('previewLembrete');
+        const previewCancelamento = document.getElementById('previewCancelamento');
+        const btnSalvar = document.getElementById('btnSalvarAntecedencia');
+        const mensagem = document.getElementById('mensagemAntecedencia');
+
+        const valorOriginal = Number(seletor.value);
+
+        seletor.addEventListener('change', function () {
+            const minutos = Number(seletor.value);
+
+            if (![30, 60].includes(minutos)) {
+                btnSalvar.disabled = true;
+                return;
+            }
+
+            previewLembrete.textContent =
+                (minutos + 5) + ' minutos antes';
+
+            previewCancelamento.textContent =
+                minutos + ' minutos antes';
+
+            btnSalvar.disabled = minutos === valorOriginal;
+        });
+
+        let salvando = false;
+
+        btnSalvar.addEventListener('click', async function () {
+
+            if (salvando || btnSalvar.disabled) return;
+
+            const minutos = Number(seletor.value);
+
+            if (![30, 60].includes(minutos)) return;
+
+            salvando = true;
+            btnSalvar.disabled = true;
+            btnSalvar.textContent = 'Salvando...';
+
+            mensagem.classList.add('d-none');
+            mensagem.classList.remove('alert-success', 'alert-danger');
+
+            try {
+                const resposta = await fetch(
+                    '/agenda/api/salvar_configuracao_lembrete.php',
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': <?= json_encode(
+                                gerarTokenCsrf(),
+                                JSON_HEX_TAG | JSON_HEX_AMP |
+                                JSON_HEX_APOS | JSON_HEX_QUOT
+                            ) ?>
+                        },
+                        body: JSON.stringify({
+                            antecedencia_cancelamento_minutos: minutos
+                        })
+                    }
+                );
+
+                const dados = await resposta.json();
+
+                if (!resposta.ok || !dados.sucesso) {
+                    throw new Error(
+                        dados.erro || 'Não foi possível salvar a configuração.'
+                    );
+                }
+
+                mensagem.textContent = 'Configuração salva com sucesso!';
+                mensagem.classList.add('alert-success');
+                mensagem.classList.remove('d-none');
+
+                // Atualiza a página para carregar o valor salvo no banco.
+                window.location.reload();
+
+            } catch (erro) {
+                mensagem.textContent = erro.message;
+                mensagem.classList.add('alert-danger');
+                mensagem.classList.remove('d-none');
+
+                salvando = false;
+                btnSalvar.textContent = 'Salvar configuração';
+                btnSalvar.disabled = false;
+            }
+        });
+
+
+    });
+    </script>
+
 </body>
 </html>

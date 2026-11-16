@@ -99,10 +99,38 @@ if ($barbearia) {
             http_response_code(404);
             exit('Página não encontrada.');
         }
-    } else {
-        include __DIR__ . '/views/cliente_agendamento.php';
-    }
+        } elseif (isset($partes[1]) && $partes[1] === 'agendamento') {
 
+            // Página pública de consulta individual de agendamento.
+            // O token será validado dentro da página.
+            if (
+                count($partes) !== 3 ||
+                !preg_match('/^[a-f0-9]{64}$/', $partes[2])
+            ) {
+                http_response_code(404);
+                exit('Agendamento não encontrado.');
+            }
+
+            // Evita exposição do token a sites externos e caches.
+            header('Referrer-Policy: no-referrer');
+            header('Cache-Control: no-store, private');
+            header('X-Robots-Tag: noindex, nofollow');
+
+            $tokenConsulta = $partes[2];
+
+            include __DIR__ . '/views/cliente_consultar_agendamento.php';
+            exit;
+
+        } elseif (count($partes) === 1) {
+
+            include __DIR__ . '/views/cliente_agendamento.php';
+
+        } else {
+
+            http_response_code(404);
+            exit('Página não encontrada.');
+
+        }
 
 } else {
     http_response_code(404);

@@ -5,6 +5,7 @@ header('Content-Type: application/json; charset=utf-8');
 require_once '../db.php';
 require_once '../helpers/agenda.php';
 require_once '../helpers/telefone.php';
+require_once __DIR__ . '/../helpers/token_consulta.php';
 
 // Permite apenas requisições POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -61,7 +62,7 @@ if ($inicio_reserva->format('Y-m-d') > $data_limite->format('Y-m-d')) {
     exit;
 }
 
-// Padrao unico para clientes brasileiros: +55 + DDD + numero.
+// Padrão único para clientes brasileiros: +55 + DDD + número.
 $whatsapp_limpo = normalizarWhatsappBR($whatsapp_cliente);
 if ($whatsapp_limpo === null) {
     http_response_code(400);
@@ -147,11 +148,29 @@ try {
     $usuario_id = (int) $barbeiro['id'];
 
     // 7. Salva o agendamento com o nome informado pelo cliente
+    // Gera um token exclusivo e seguro para consulta do agendamento.
+    // O hash e a versão criptografada são armazenados no banco.
+    $tokenConsulta = bin2hex(random_bytes(32));
+    $tokenConsultaHash = hash('sha256', $tokenConsulta);
+    $tokenConsultaCifrado = cifrarTokenConsulta($tokenConsulta);
+
     $stmt = $db->prepare("
         INSERT INTO agendamentos
-        (barbearia_id, cliente_id, nome_cliente, servico_id, usuario_id,
-        data_agendamento, horario_inicio, horario_fim, status, notificacao_enviada)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'agendado', 0)
+        (
+            barbearia_id,
+            cliente_id,
+            nome_cliente,
+            servico_id,
+            usuario_id,
+            data_agendamento,
+            horario_inicio,
+            horario_fim,
+            status,
+            notificacao_enviada,
+            token_consulta_hash,
+            token_consulta_cifrado
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'agendado', 0, ?, ?)
     ");
 
     $stmt->execute([
@@ -162,15 +181,32 @@ try {
         $usuario_id,
         $data_agendamento,
         $horario_inicio_formatado,
-        $horario_fim
+        $horario_fim,
+        $tokenConsultaHash,
+        $tokenConsultaCifrado
     ]);
+
+    // Identifica o agendamento recém-criado
+    $agendamento_id = (int) $db->lastInsertId();
+
+    // Obtém o preço do serviço para retornar ao cliente
+    $valor_servico = (float) $servico['preco'];
 
     $db->commit(); // Confirma as gravações no banco
 
     echo json_encode([
         'sucesso' => true,
-        'mensagem' => 'Agendamento realizado com sucesso!'
-    ]);
+        'mensagem' => 'Agendamento realizado com sucesso!',
+        'agendamento' => [
+            'id' => $agendamento_id,
+            'cliente' => $nome_cliente,
+            'servico' => $servico['nome'],
+            'data' => $data_agendamento,
+            'horario' => substr($horario_inicio_formatado, 0, 5),
+            'valor' => number_format($valor_servico, 2, '.', ''),
+            'token_consulta' => $tokenConsulta
+        ]
+    ], JSON_UNESCAPED_UNICODE);
 
 } catch (Exception $e) {
     if (isset($db) && $db->inTransaction()) {

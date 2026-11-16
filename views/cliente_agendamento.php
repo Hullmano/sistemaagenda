@@ -13,7 +13,7 @@ $servicos_reais = $stmt->fetchAll();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Agendamento - <?php echo htmlspecialchars($barbearia_nome); ?></title>
-    
+
     <!-- Links Estáveis via CDN (cdnjs) -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
@@ -28,8 +28,8 @@ $servicos_reais = $stmt->fetchAll();
             --text-secondary: #8F9BB3;
             --accent: #FF9F43;
         }
-        body { 
-            background-color: var(--bg-main); 
+        body {
+            background-color: var(--bg-main);
             color: var(--text-primary);
             font-family: 'Plus Jakarta Sans', sans-serif;
         }
@@ -79,7 +79,14 @@ $servicos_reais = $stmt->fetchAll();
                             <?php foreach($servicos_reais as $index => $servico): ?>
                                 <label class="d-flex justify-content-between align-items-center p-3 border border-secondary rounded-3" style="--bs-border-opacity: .15; cursor: pointer; background: rgba(255,255,255,0.02);">
                                     <div class="d-flex align-items-center gap-3">
-                                        <input type="radio" name="servico" value="<?php echo $servico['id']; ?>" class="form-check-input seletor-servico m-0">
+                                    <input
+                                        type="radio"
+                                        name="servico"
+                                        value="<?= (int)$servico['id'] ?>"
+                                        data-nome="<?= htmlspecialchars($servico['nome'], ENT_QUOTES, 'UTF-8') ?>"
+                                        data-preco="<?= htmlspecialchars((string)$servico['preco'], ENT_QUOTES, 'UTF-8') ?>"
+                                        class="form-check-input seletor-servico m-0"
+                                    >
                                         <div>
                                             <span class="fw-bold text-white text-sm d-block"><?php echo htmlspecialchars($servico['nome']); ?></span>
                                             <small class="text-secondary">⏱️ <?php echo $servico['duracao_minutos']; ?> min</small>
@@ -148,8 +155,42 @@ $servicos_reais = $stmt->fetchAll();
                     </div>
                 </div>
 
+                <!-- Resumo do Agendamento -->
+                <div id="secao-resumo" class="card-custom p-3 shadow-sm mb-3">
+
+                    <h6 class="fw-bold text-white mb-3">
+                        <i class="fa-solid fa-clipboard-list text-warning me-2"></i>
+                        Resumo do Agendamento
+                    </h6>
+
+                    <div class="small">
+
+                        <div class="d-flex justify-content-between gap-2 mb-2">
+                            <span class="text-secondary">Serviço</span>
+                            <strong id="resumo-servico" class="text-white text-end">—</strong>
+                        </div>
+
+                        <div class="d-flex justify-content-between gap-2 mb-2">
+                            <span class="text-secondary">Data</span>
+                            <strong id="resumo-data" class="text-white">—</strong>
+                        </div>
+
+                        <div class="d-flex justify-content-between gap-2 mb-2">
+                            <span class="text-secondary">Horário</span>
+                            <strong id="resumo-horario" class="text-white">—</strong>
+                        </div>
+
+                        <div class="border-top border-secondary pt-3 mt-3
+                                    d-flex justify-content-between align-items-center">
+                            <span class="fw-bold">Valor do serviço</span>
+                            <strong id="resumo-valor" class="text-warning fs-5">—</strong>
+                        </div>
+
+                    </div>
+                </div>
+
                 <!-- PASSO 4: Identificação do Cliente -->
-                <div class="card-custom p-3 shadow-sm">
+                <div id="secao-dados-cliente" class="card-custom p-3 shadow-sm">
                     <div class="d-flex align-items-center gap-2 mb-3">
                         <span class="badge bg-warning text-dark fw-bold">3</span>
                         <h6 class="m-0 fw-bold text-white">Seus Dados</h6>
@@ -231,12 +272,15 @@ $servicos_reais = $stmt->fetchAll();
                 botao.type = 'button';
                 botao.className = 'btn btn-outline-light w-100 p-1';
                 botao.style.fontSize = '0.7rem';
+                botao.style.minHeight = '65px';
 
                 botao.innerHTML = `
                     <small class="d-block">${nomesDias[data.getDay()]}</small>
-                    <strong class="d-block">${data.getDate()}</strong>
-                    <small>${String(data.getMonth() + 1).padStart(2, '0')}</small>
+                    <strong class="d-block">
+                        ${String(data.getDate()).padStart(2, '0')}/${String(data.getMonth() + 1).padStart(2, '0')}
+                    </strong>
                 `;
+
 
                 if (campoData.value === valor) {
                     botao.classList.remove('btn-outline-light');
@@ -284,6 +328,31 @@ $servicos_reais = $stmt->fetchAll();
         const campoNome = document.getElementById('cliente-nome');
         const campoWhats = document.getElementById('cliente-whatsapp');
         let horarioSelecionado = '';
+
+        function atualizarResumo() {
+            const servico = document.querySelector('input[name="servico"]:checked');
+
+            const nomeServico = servico?.dataset.nome || '—';
+            const precoServico = Number(servico?.dataset.preco || 0);
+
+            const partesData = campoData.value.split('-');
+
+            const dataFormatada = partesData.length === 3
+                ? `${partesData[2]}/${partesData[1]}/${partesData[0]}`
+                : '—';
+
+            document.getElementById('resumo-servico').textContent = nomeServico;
+            document.getElementById('resumo-data').textContent = dataFormatada;
+            document.getElementById('resumo-horario').textContent =
+                horarioSelecionado || 'Selecione um horário';
+
+            document.getElementById('resumo-valor').textContent =
+                precoServico.toLocaleString('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL'
+                });
+        }
+
         // Salva apenas no navegador, com consentimento. Nunca e prova de identidade.
         const chaveLocal = 'agenda_cliente_' + barbeariaId;
         const lembrar = document.getElementById('lembrar-cliente');
@@ -309,6 +378,7 @@ $servicos_reais = $stmt->fetchAll();
 
             containerHorarios.innerHTML = '<p class="text-xs text-muted text-center w-100 py-2 m-0"><i class="fa-solid fa-spinner fa-spin me-1"></i> Procurando vagas...</p>';
             horarioSelecionado = '';
+            atualizarResumo();
 
             fetch('/agenda/api/horarios_disponiveis.php?barbearia_id=' + barbeariaId + '&data=' + dataSelecionada + '&servico_id=' + servicoSelecionado)
                 .then(r => r.json())
@@ -323,21 +393,44 @@ $servicos_reais = $stmt->fetchAll();
                     dados.horarios.forEach(horario => {
                         const col = document.createElement('div');
                         col.className = 'col px-1';
-                        
+
                         const btn = document.createElement('button');
                         btn.type = 'button';
                         btn.className = 'btn btn-outline-light w-100 btn-horario btn-slot-cliente';
                         btn.textContent = horario;
-                        
+
                         btn.addEventListener('click', function() {
                             document.querySelectorAll('.btn-slot-cliente').forEach(b => {
                                 b.classList.remove('btn-warning', 'text-dark');
                                 b.classList.add('btn-outline-light');
                             });
+
                             btn.classList.remove('btn-outline-light');
                             btn.classList.add('btn-warning', 'text-dark');
+
                             horarioSelecionado = horario;
+                            atualizarResumo();
+
+                            // Após selecionar o horário, mostra os dados do cliente.
+                            const secaoDados = document.getElementById('secao-resumo');
+
+                            if (secaoDados) {
+                                const alturaCabecalho =
+                                    document.querySelector('.header-custom')?.offsetHeight || 0;
+
+                                const destino =
+                                    secaoDados.getBoundingClientRect().top +
+                                    window.scrollY -
+                                    alturaCabecalho -
+                                    12;
+
+                                window.scrollTo({
+                                    top: Math.max(0, destino),
+                                    behavior: 'smooth'
+                                });
+                            }
                         });
+
 
                         col.appendChild(btn);
                         containerHorarios.appendChild(col);
@@ -393,16 +486,149 @@ $servicos_reais = $stmt->fetchAll();
                             localStorage.removeItem(chaveLocal);
                         }
                     } catch (e) { /* navegador bloqueou armazenamento */ }
-                    document.querySelector('main').innerHTML = `
-                        <div class="card-custom text-center p-5 space-y-4 shadow shadow-lg border border-success" style="--bs-border-opacity: .3;">
-                            <div class="text-success mb-3" style="font-size: 4rem;"><i class="fa-solid fa-circle-check animate-pulse"></i></div>
-                            <h4 class="fw-extrabold text-success">Agendado com Sucesso!</h4>
-                            <p class="text-white-50 text-sm">Tudo certo, <strong>${campoNome.value}</strong>! Seu horário foi reservado para o dia ${campoData.value} às ${horarioSelecionado}.</p>
-                            <div class="alert alert-warning text-xs font-semibold py-2 m-0 mt-3 border-0 bg-warning bg-opacity-10 text-warning" style="font-size: 0.75rem;">
-                                <i class="fa-brands fa-whatsapp me-1"></i> Um lembrete automático será enviado 1 hora antes do corte!
+                        const agendamento = res.agendamento;
+
+                        if (!agendamento) {
+                            alert('Reserva registrada, mas não foi possível exibir o resumo.');
+                            window.location.reload();
+                            return;
+                        }
+
+                        const partesData = agendamento.data.split('-');
+                        const dataFormatada = partesData.length === 3
+                            ? `${partesData[2]}/${partesData[1]}/${partesData[0]}`
+                            : agendamento.data;
+
+                        document.querySelector('main').innerHTML = `
+                            <div class="card-custom p-4 shadow-lg">
+
+                                <div class="text-center mb-4">
+                                    <i class="fa-solid fa-circle-check text-success"
+                                    style="font-size: 3.5rem;"></i>
+
+                                    <h4 class="text-success fw-bold mt-3">
+                                        Agendamento confirmado!
+                                    </h4>
+
+                                    <p class="text-secondary small">
+                                        Seu horário foi reservado com sucesso.
+                                    </p>
+                                </div>
+
+                                <div class="card-custom p-3 mb-3">
+                                    <h6 class="fw-bold text-warning mb-3">
+                                        <i class="fa-solid fa-calendar-check me-2"></i>
+                                        Detalhes do agendamento
+                                    </h6>
+
+                                    <div class="small d-flex flex-column gap-3">
+
+                                        <div class="d-flex justify-content-between gap-2">
+                                            <span class="text-secondary">Cliente</span>
+                                            <strong id="sucesso-cliente"
+                                                    class="text-end"></strong>
+                                        </div>
+
+                                        <div class="d-flex justify-content-between gap-2">
+                                            <span class="text-secondary">Serviço</span>
+                                            <strong id="sucesso-servico"
+                                                    class="text-end"></strong>
+                                        </div>
+
+                                        <div class="d-flex justify-content-between gap-2">
+                                            <span class="text-secondary">Data</span>
+                                            <strong id="sucesso-data"></strong>
+                                        </div>
+
+                                        <div class="d-flex justify-content-between gap-2">
+                                            <span class="text-secondary">Horário</span>
+                                            <strong id="sucesso-horario"></strong>
+                                        </div>
+
+                                        <div class="d-flex justify-content-between
+                                                    border-top border-secondary pt-3">
+                                            <span class="fw-bold">Valor</span>
+                                            <strong id="sucesso-valor"
+                                                    class="text-warning fs-5"></strong>
+                                        </div>
+
+                                    </div>
+                                </div>
+
+                                <div class="alert alert-success small">
+                                    <i class="fa-solid fa-check-circle me-1"></i>
+                                    Sua reserva foi registrada.
+                                </div>
+
+                                <a id="link-consultar-agendamento"
+                                href="#"
+                                class="btn btn-outline-warning w-100 py-3 fw-bold mb-3"
+                                style="display: none;"
+                                rel="noreferrer">
+                                    <i class="fa-solid fa-calendar-check me-2"></i>
+                                    Consultar meu agendamento
+                                </a>
+
+                                <button type="button"
+                                        id="btn-novo-agendamento"
+                                        class="btn btn-warning w-100 py-3 fw-bold text-dark">
+                                    <i class="fa-solid fa-calendar-plus me-2"></i>
+                                    Fazer novo agendamento
+                                </button>
+
                             </div>
-                        </div>
-                    `;
+                        `;
+
+                        // Utiliza os dados confirmados pelo servidor.
+                        document.getElementById('sucesso-cliente').textContent =
+                            agendamento.cliente;
+
+                        document.getElementById('sucesso-servico').textContent =
+                            agendamento.servico;
+
+                        document.getElementById('sucesso-data').textContent =
+                            dataFormatada;
+
+                        document.getElementById('sucesso-horario').textContent =
+                            agendamento.horario;
+
+                        document.getElementById('sucesso-valor').textContent =
+                            Number(agendamento.valor).toLocaleString('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL'
+                            });
+
+                            // Monta o endereço de consulta a partir da página pública atual.
+                            const tokenConsulta = agendamento.token_consulta;
+
+                            if (
+                                typeof tokenConsulta === 'string' &&
+                                /^[a-f0-9]{64}$/.test(tokenConsulta)
+                            ) {
+                                const caminhoAtual = window.location.pathname.replace(/\/+$/, '');
+
+                                const linkConsulta =
+                                    window.location.origin +
+                                    caminhoAtual +
+                                    '/agendamento/' +
+                                    tokenConsulta;
+
+                                const botaoConsulta = document.getElementById(
+                                    'link-consultar-agendamento'
+                                );
+
+                                botaoConsulta.href = linkConsulta;
+                                botaoConsulta.style.display = 'block';
+                            }
+
+                        // Permite iniciar outro agendamento.
+                        document.getElementById('btn-novo-agendamento')
+                            .addEventListener('click', function () {
+                                window.location.reload();
+                            });
+
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+
                 } else {
                     alert('Erro: ' + res.erro);
                     btnFinalizar.disabled = false;
