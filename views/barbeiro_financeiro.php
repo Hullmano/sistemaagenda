@@ -257,7 +257,7 @@ $historicoRecebimentos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="card bg-secondary text-white mb-3">
         <div class="card-body">
 
-            <small>Pendente dos atendimentos do dia</small>
+            <small>Pagamentos pendentes do dia</small>
 
             <h3 class="mb-0">
                 R$ <?= number_format(

@@ -500,7 +500,7 @@ if ($usuario['nivel'] === 'barbeiro') {
                     <div class="card-stats shadow-sm">
                         <span class="text-secondary d-block mb-1 text-uppercase fw-bold"
                             style="font-size: 0.65rem; letter-spacing: 0.5px;">
-                            Pendente dos atendimentos do dia
+                            Pagamentos pendentes do dia
                         </span>
 
                         <h3 class="fw-extrabold m-0 text-warning">
