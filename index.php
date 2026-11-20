@@ -78,7 +78,7 @@ if ($barbearia) {
         }
 
         // Áreas restritas ao proprietário.
-        $rotas_dono = ['servicos', 'horarios', 'whatsapp'];
+        $rotas_dono = ['servicos', 'horarios', 'whatsapp', 'financeiro'];
 
         if (
             in_array($sub_acao, $rotas_dono, true) &&
@@ -93,6 +93,10 @@ if ($barbearia) {
             include __DIR__ . '/views/admin_horarios.php';
         } elseif ($sub_acao === 'whatsapp') {
             include __DIR__ . '/views/admin_whatsapp.php';
+        } elseif ($sub_acao === 'financeiro') {
+            include __DIR__ . '/views/admin_financeiro.php';
+        } elseif ($sub_acao === 'meu-financeiro') {
+            include __DIR__ . '/views/barbeiro_financeiro.php';
         } elseif ($sub_acao === '') {
             include __DIR__ . '/views/admin_painel.php';
         } else {
