@@ -99,7 +99,18 @@ try {
     $db = \Database::getConnection();
 
     // 3. Busca a duração do serviço selecionado no banco de dados
-    $stmt = $db->prepare("SELECT duracao_minutos FROM servicos WHERE id = ? AND barbearia_id = ? AND ativo = 1 LIMIT 1");
+    $stmt = $db->prepare("
+        SELECT s.duracao_minutos
+        FROM servicos s
+        INNER JOIN barbearias b
+            ON b.id = s.barbearia_id
+        WHERE s.id = ?
+        AND s.barbearia_id = ?
+        AND s.ativo = 1
+        AND b.ativo = 1
+        LIMIT 1
+    ");
+
     $stmt->execute([$servico_id, $barbearia_id]);
     $servico = $stmt->fetch();
 

@@ -61,6 +61,7 @@ try {
         WHERE u.email = ?
           AND b.slug = ?
           AND b.ativo = 1
+          AND u.ativo = 1
         LIMIT 1
     ");
 

@@ -45,6 +45,34 @@ function usuarioLogado(): ?array
         return null;
     }
 
+    // Confirma no banco que a barbearia continua ativa.
+    // Uma sessão antiga não deve permitir acesso
+    // depois que a barbearia for desativada.
+    $db = Database::getConnection();
+
+    $stmt = $db->prepare("
+        SELECT u.id
+        FROM usuarios u
+        INNER JOIN barbearias b
+            ON b.id = u.barbearia_id
+        WHERE u.id = ?
+        AND u.barbearia_id = ?
+        AND u.nivel = ?
+        AND u.ativo = 1
+        AND b.ativo = 1
+        LIMIT 1
+    ");
+
+    $stmt->execute([
+        $id,
+        $barbeariaId,
+        $nivel
+    ]);
+
+    if (!$stmt->fetchColumn()) {
+        return null;
+    }
+
     return $usuario;
 }
 

@@ -81,6 +81,7 @@ try {
         SELECT id
         FROM barbearias
         WHERE id = ?
+        AND ativo = 1
         FOR UPDATE
     ");
 
@@ -132,6 +133,7 @@ try {
         FROM usuarios
         WHERE barbearia_id = ?
         AND nivel = 'barbeiro'
+        AND ativo = 1
         ORDER BY id ASC
         LIMIT 1
     ");

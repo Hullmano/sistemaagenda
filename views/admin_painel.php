@@ -407,6 +407,12 @@ if ($usuario['nivel'] === 'barbeiro') {
                         <a href="/agenda/<?= rawurlencode($slug_filtrado) ?>/admin/clientes" class="btn btn-sm btn-dark border-secondary text-white rounded-3 p-2 text-decoration-none d-flex align-items-center" title="Clientes e Histórico" aria-label="Clientes e Histórico">
                             <i class="fa-solid fa-users"></i>
                         </a>
+                        <a href="/agenda/<?= rawurlencode($slug_filtrado) ?>/admin/barbeiros"
+                            class="btn btn-sm btn-dark border-secondary text-white rounded-3 p-2 text-decoration-none d-flex align-items-center"
+                            title="Gerenciar barbeiros"
+                            aria-label="Gerenciar barbeiros">
+                                <i class="fa-solid fa-user-group"></i>
+                            </a>
                         <a href="/agenda/<?php echo $slug_filtrado; ?>/admin/servicos" class="btn btn-sm btn-dark border-secondary text-white rounded-3 p-2 text-decoration-none d-flex align-items-center" title="Catálogo de Serviços">
                             <i class="fa-solid fa-tags"></i>
                         </a>

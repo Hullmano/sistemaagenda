@@ -21,6 +21,76 @@ if ($url === '') {
 $partes = explode('/', $url);
 $slug_filtrado = $partes[0] ?? ''; 
 
+ // Área exclusiva do administrador geral do SaaS.
+if ($slug_filtrado === 'plataforma') {
+
+    require_once __DIR__ . '/helpers/auth_plataforma.php';
+
+    if (count($partes) > 2) {
+        http_response_code(404);
+        exit('Página não encontrada.');
+    }
+
+    $acaoPlataforma = $partes[1] ?? '';
+
+    if ($acaoPlataforma === 'login') {
+        include __DIR__ . '/views/plataforma_login.php';
+        exit;
+    }
+
+    if ($acaoPlataforma === '') {
+        $adminPlataforma = exigirAdministradorPlataforma();
+
+        include __DIR__ . '/views/plataforma_painel.php';
+        exit;
+    }
+
+    if ($acaoPlataforma === 'nova') {
+        $adminPlataforma = exigirAdministradorPlataforma();
+
+        include __DIR__ . '/views/plataforma_barbearia_form.php';
+        exit;
+    }
+    if ($acaoPlataforma === 'editar') {
+        $adminPlataforma = exigirAdministradorPlataforma();
+
+        $barbeariaId = filter_input(
+            INPUT_GET,
+            'id',
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]]
+        );
+
+        if ($barbeariaId === false || $barbeariaId === null) {
+            http_response_code(400);
+            exit('Identificador da barbearia inválido.');
+        }
+
+        $db = Database::getConnection();
+
+        $stmt = $db->prepare("
+            SELECT id, nome, slug, whatsapp_num, ativo
+            FROM barbearias
+            WHERE id = ?
+            LIMIT 1
+        ");
+
+        $stmt->execute([$barbeariaId]);
+        $barbearia = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$barbearia) {
+            http_response_code(404);
+            exit('Barbearia não encontrada.');
+        }
+
+        include __DIR__ . '/views/plataforma_barbearia_editar.php';
+        exit;
+    }
+
+    http_response_code(404);
+    exit('Página não encontrada.');
+}
+
 // 3. Busca a barbearia ativa no banco de dados do Droplet
 $db = \Database::getConnection();
 $stmt = $db->prepare("SELECT id, nome, whatsapp_num FROM barbearias WHERE slug = ? AND ativo = 1 LIMIT 1");
@@ -30,7 +100,7 @@ $barbearia = $stmt->fetch();
 if ($barbearia) {
     $barbearia_id = $barbearia['id'];
     $barbearia_nome = $barbearia['nome'];
-    
+
     // 4. VALIDAÇÃO DE ROTAS ADMINISTRATIVAS
     // Verifica se o segundo segmento da URL existe e é estritamente 'admin'
     // Ex: /agenda/barbearia_do_tiao/admin
@@ -87,6 +157,72 @@ if ($barbearia) {
             http_response_code(403);
             exit('Esta área é exclusiva do proprietário.');
         }
+        // Gerenciamento de barbeiros: exclusivo do proprietário.
+        if ($sub_acao === 'barbeiros') {
+            if ($usuario['nivel'] !== 'dono') {
+                http_response_code(403);
+                exit('Acesso não autorizado.');
+            }
+            include __DIR__ . '/views/admin_barbeiros.php';
+            exit;
+        }
+        // Cadastro de barbeiros: exclusivo do proprietário.
+        if ($sub_acao === 'barbeiros-novo') {
+            if ($usuario['nivel'] !== 'dono') {
+                http_response_code(403);
+                exit('Acesso não autorizado.');
+            }
+
+            include __DIR__ . '/views/admin_barbeiro_form.php';
+            exit;
+        }
+
+        // Edição de barbeiros: exclusiva do proprietário.
+        if ($sub_acao === 'barbeiros-editar') {
+                if ($usuario['nivel'] !== 'dono') {
+                    http_response_code(403);
+                    exit('Acesso não autorizado.');
+                }
+
+                $barbeiroId = filter_input(
+                    INPUT_GET,
+                    'id',
+                    FILTER_VALIDATE_INT,
+                    ['options' => ['min_range' => 1]]
+                );
+
+                if ($barbeiroId === false || $barbeiroId === null) {
+                    http_response_code(400);
+                    exit('Identificador do barbeiro inválido.');
+                }
+
+                $db = Database::getConnection();
+
+                $stmt = $db->prepare("
+                    SELECT id, nome, email, ativo
+                    FROM usuarios
+                    WHERE id = ?
+                    AND barbearia_id = ?
+                    AND nivel = 'barbeiro'
+                    LIMIT 1
+                ");
+
+                $stmt->execute([
+                    $barbeiroId,
+                    (int)$usuario['barbearia_id']
+                ]);
+
+                $barbeiro = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$barbeiro) {
+                    http_response_code(404);
+                    exit('Barbeiro não encontrado.');
+                }
+
+                include __DIR__ . '/views/admin_barbeiro_editar.php';
+                exit;
+        }
+
         if ($sub_acao === 'servicos') {
             include __DIR__ . '/views/admin_servicos.php';
         } elseif ($sub_acao === 'horarios') {
