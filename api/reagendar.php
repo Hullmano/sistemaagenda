@@ -76,6 +76,17 @@ if ($inicio <= (new DateTimeImmutable('now', $fuso))->modify('+15 minutes')) {
     );
 }
 
+// Limite de 30 dias, incluindo hoje.
+$hoje = new DateTimeImmutable('today', $fuso);
+$data_limite = $hoje->modify('+29 days');
+
+if ($inicio->format('Y-m-d') > $data_limite->format('Y-m-d')) {
+    erroReagendamento(
+        400,
+        'O reagendamento é permitido somente para os próximos 30 dias, incluindo hoje.'
+    );
+}
+
 try {
     $db = Database::getConnection();
     $db->beginTransaction();
@@ -170,7 +181,11 @@ try {
         );
     }
 
-    $fim = $inicio->modify("+{$duracao} minutes");
+    // Arredonda a duração para blocos de 15 minutos.
+    // Exemplos: 10 -> 15, 20 -> 30, 35 -> 45.
+    $duracao_bloqueada = (int) (ceil($duracao / 15) * 15);
+
+    $fim = $inicio->modify("+{$duracao_bloqueada} minutes");
 
     $stmt = $db->prepare("
         UPDATE agendamentos

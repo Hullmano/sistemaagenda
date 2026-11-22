@@ -45,11 +45,11 @@ function obterHorariosLivres( $db, $barbearia_id, $data_desejada, $duracao_servi
     $stmt->execute([$barbearia_id, $data_desejada, (int) $ignorar_agendamento_id]);
     $agendamentos_ocupados = $stmt->fetchAll();
 
-    // 4. Gerar a grade de horários possíveis do dia (de 30 em 30 minutos)
+    // 4. Gerar a grade de horários possíveis do dia (de 15 em 15 minutos)
     $horarios_disponiveis = [];
     $atual = strtotime($funcionamento['hora_abertura']);
     $fim_expediente = strtotime($funcionamento['hora_fechamento']);
-    $intervalo = 30 * 60; // 30 minutos em segundos
+    $intervalo = 15 * 60; // 15 minutos em segundos
 
     // Horários de almoço convertidos para timestamp (se houver)
     $almoco_inicio = $funcionamento['hora_almoco_inicio'] ? strtotime($funcionamento['hora_almoco_inicio']) : null;
@@ -68,7 +68,11 @@ function obterHorariosLivres( $db, $barbearia_id, $data_desejada, $duracao_servi
         }
 
         // Calcula o horário hipotético de término deste serviço
-        $termino_servico = $atual + ($duracao_servico_minutos * 60);
+        // Arredonda a duração para blocos de 15 minutos.
+        // Exemplos: 10 -> 15, 20 -> 30, 35 -> 45.
+        $duracao_bloqueada = (int) (ceil($duracao_servico_minutos / 15) * 15);
+
+        $termino_servico = $atual + ($duracao_bloqueada * 60);
 
 
         // Se o serviço ultrapassar o horário de fechamento da barbearia, encerra o loop

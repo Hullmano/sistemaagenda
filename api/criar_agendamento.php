@@ -103,7 +103,15 @@ try {
 
     // 3. Calcula o horário de término do agendamento (Essencial para o nosso algoritmo de colisão)
     $timestamp_inicio = strtotime($horario_inicio);
-    $duracao_segundos = (int)$servico['duracao_minutos'] * 60;
+
+    // Arredonda o tempo reservado para blocos de 15 minutos.
+    // Exemplos: 10 -> 15, 20 -> 30, 35 -> 45.
+    $duracao_original = (int)$servico['duracao_minutos'];
+
+    $duracao_bloqueada = (int) (ceil($duracao_original / 15) * 15);
+
+    $duracao_segundos = $duracao_bloqueada * 60;
+
     $horario_fim = date('H:i:s', $timestamp_inicio + $duracao_segundos);
     $horario_inicio_formatado = date('H:i:s', $timestamp_inicio);
 
@@ -132,9 +140,11 @@ try {
         SELECT id
         FROM usuarios
         WHERE barbearia_id = ?
-        AND nivel = 'barbeiro'
+        AND nivel IN ('barbeiro', 'dono')
         AND ativo = 1
-        ORDER BY id ASC
+        ORDER BY
+        CASE WHEN nivel = 'barbeiro' THEN 0 ELSE 1 END,
+        id ASC
         LIMIT 1
     ");
 
