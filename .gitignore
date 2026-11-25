@@ -1,3 +1,13 @@
+# Configuracoes privadas
 /config.local.php
+/config.local.php.*
 /.env
-/*.bak
+/.env.*
+
+# Backups em qualquer pasta
+*.bak
+*.bak_*
+*.backup
+
+# Arquivos temporarios de testes
+/testes/
