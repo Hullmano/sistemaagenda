@@ -190,7 +190,7 @@ try {
     // 9. Protecao durante o desenvolvimento.
     // Enquanto o envio real nao estiver implementado,
     // o webhook funciona somente em modo diagnostico.
-    $modoDiagnostico = $config['whatsapp_diagnostico'] ?? true;
+    $modoDiagnostico = $config['whatsapp_saudacao_diagnostico'] ?? false;
 
     if ($modoDiagnostico !== true) {
         // Saudacao automatica ainda nao foi ativada.
