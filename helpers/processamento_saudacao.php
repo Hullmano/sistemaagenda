@@ -20,69 +20,55 @@ function processarSaudacaoWhatsapp(
     string $apiKey,
     bool $modoDiagnostico = true,
     bool $permitirEnvioReal = false
-    ): array {
+): array {
+        // Diagnostico: nao reserva e nao envia mensagens.
+        if ($modoDiagnostico) {
+            return [
+                'status' => 'diagnostico',
+                'processado' => false
+            ];
+        }
 
-    // Bloqueia qualquer processamento real
-    // enquanto estamos desenvolvendo.
-    if ($modoDiagnostico) {
-        return [
-            'status' => 'diagnostico',
-            'processado' => false
-        ];
-    }
+        // Trava adicional de seguranca.
+        // Ainda nao liberaremos o envio nesta etapa.
+        $integracaoLiberada = false;
 
-    // Terceira trava: impede o envio real enquanto
-    // a integracao nao estiver completamente validada.
-    $integracaoLiberada = false;
+        if (!$permitirEnvioReal || !$integracaoLiberada) {
+            return [
+                'status' => 'nao_implementado',
+                'processado' => false
+            ];
+        }
 
-    if (!$integracaoLiberada) {
-        return [
-            'status' => 'nao_implementado',
-            'processado' => false
-        ];
-    }
-
-    // Confere a chave antes de criar uma reserva.
-    if (trim($apiKey) === '') {
-        throw new InvalidArgumentException(
-            'Chave da Evolution API nao configurada.'
-        );
-    }
-
-    // Reserva -> envio -> finalizacao.
-    return executarProcessamentoReservadoSaudacao(
-        $db,
-        $barbeariaId,
-        $whatsapp,
-        function () use (
-            $requisicao,
-            $apiKey
-        ): array {
-            return executarEnvioSaudacao(
-                $requisicao['url'],
-                $requisicao['payload'],
-                $apiKey,
-                true
+        if (trim($apiKey) === '') {
+            throw new InvalidArgumentException(
+                'Chave da Evolution API nao configurada.'
             );
         }
-    );
 
-    // Prepara e valida os dados antes de qualquer reserva.
-    // Nenhuma chamada HTTP e realizada nesta etapa.
-    $requisicao = prepararEnvioSaudacao(
-        $apiUrl,
-        $instancia,
-        $whatsapp,
-        $mensagem
-    );
+        // Preparar e validar antes de reservar.
+        $requisicao = prepararEnvioSaudacao(
+            $apiUrl,
+            $instancia,
+            $whatsapp,
+            $mensagem
+        );
 
-    // Trava de seguranca: o envio real ainda nao esta habilitado.
-    return [
-        'status' => 'nao_implementado',
-        'processado' => false
-    ];
+        // Reserva -> envio -> finalizacao.
+        return executarProcessamentoReservadoSaudacao(
+            $db,
+            $barbeariaId,
+            $whatsapp,
+            function () use ($requisicao, $apiKey): array {
+                return executarEnvioSaudacao(
+                    $requisicao['url'],
+                    $requisicao['payload'],
+                    $apiKey,
+                    true
+                );
+            }
+        );
 }
-
 
 /**
  * Finaliza uma tentativa de saudacao que ja possui

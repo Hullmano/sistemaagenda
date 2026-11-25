@@ -120,6 +120,16 @@ try {
         ]);
     }
 
+    // Autorizacao para futuros testes de envio real.
+    // Por enquanto, apenas calcula a permissao.
+    // Nao envia mensagens nem altera o modo diagnostico.
+    require_once __DIR__ . '/../helpers/autorizacao_saudacao.php';
+
+    $envioRealAutorizado = envioSaudacaoAutorizado(
+        $config,
+        $whatsapp
+    );
+
     // 6. Identifica a barbearia pela instancia.
     $slug = substr($instancia, strlen('barber_'));
 
@@ -192,7 +202,12 @@ try {
     // o webhook funciona somente em modo diagnostico.
     $modoDiagnostico = $config['whatsapp_saudacao_diagnostico'] ?? false;
 
-    if ($modoDiagnostico !== true) {
+    // Teste real permitido somente com ativacao explicita
+    // e telefone previamente autorizado.
+    $modoTesteControlado = $envioRealAutorizado;
+
+    // Se nenhum modo estiver habilitado, desativa a saudacao.
+    if ($modoDiagnostico !== true && !$modoTesteControlado) {
         // Saudacao automatica ainda nao foi ativada.
         // Responde 200 para evitar tentativas repetidas
         // de entrega do mesmo evento.
@@ -265,6 +280,15 @@ try {
     // Nenhuma reserva ou mensagem sera enviada.
     require_once __DIR__ . '/../helpers/processamento_saudacao.php';
 
+    // Diagnostico tem prioridade sobre o teste controlado.
+    // Fora do diagnostico, somente um telefone autorizado
+    // podera prosseguir para o processamento.
+    $diagnosticoEfetivo = $modoDiagnostico === true;
+
+    // Trava temporaria de desenvolvimento:
+    // impede a execucao do envio real.
+    $liberacaoFinalEnvio = false;
+
     $resultadoProcessamento = processarSaudacaoWhatsapp(
         $db,
         (int) $barbearia['id'],
@@ -273,26 +297,37 @@ try {
         '',
         $instancia,
         '',
-        true
+        $diagnosticoEfetivo,
+        $liberacaoFinalEnvio && $modoTesteControlado
     );
 
-    if (
-        $resultadoProcessamento['status'] !== 'diagnostico' ||
-        $resultadoProcessamento['processado'] !== false
-    ) {
-        throw new RuntimeException(
-            'Resultado inesperado do processamento de saudacao.'
-        );
+    // Interpreta o resultado sem expor dados do cliente.
+    if ($diagnosticoEfetivo) {
+        if (
+            ($resultadoProcessamento['status'] ?? null) !== 'diagnostico' ||
+            ($resultadoProcessamento['processado'] ?? null) !== false
+        ) {
+            throw new RuntimeException(
+                'Resultado inesperado do diagnostico.'
+            );
+        }
+
+        responderWebhook(200, [
+            'sucesso' => true,
+            'processado' => false,
+            'motivo' => 'diagnostico_concluido'
+        ]);
     }
 
-    // Diagnostico temporario: apenas confirma que a mensagem
-    // foi preparada. Nao retorna o nome ou o telefone.
-    // Resposta sem informacoes sobre cadastro ou historico do cliente.
-    responderWebhook(200, [
-        'sucesso' => true,
-        'processado' => false,
-        'motivo' => 'diagnostico_concluido'
-    ]);
+    // Interpreta os resultados do processamento
+    // sem revelar informacoes do cliente.
+    require_once __DIR__ . '/../helpers/resposta_saudacao.php';
+
+    $resposta = respostaProcessamentoSaudacao(
+        $resultadoProcessamento
+    );
+
+    responderWebhook(200, $resposta);
 
 } catch (Throwable $e) {
     error_log('Falha no recebimento do webhook WhatsApp.');
