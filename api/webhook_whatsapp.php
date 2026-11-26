@@ -81,6 +81,41 @@ try {
 
     $chaveMensagem = $dadosMensagem['key'];
 
+    // Diagnostico temporario dos identificadores @lid.
+    // Registra somente nomes de campos, nunca seus valores.
+    if (($config['whatsapp_diagnostico_lid'] ?? false) === true) {
+
+        $jidDiagnostico = $chaveMensagem['remoteJid'] ?? null;
+
+        if (
+            is_string($jidDiagnostico) &&
+            str_ends_with($jidDiagnostico, '@lid')
+        ) {
+            $filtrarCampos = static function (array $dados): array {
+                return array_slice(
+                    array_values(
+                        array_filter(
+                            array_keys($dados),
+                            static fn($campo) =>
+                                is_string($campo) &&
+                                preg_match('/^[A-Za-z][A-Za-z0-9_]{0,39}$/', $campo)
+                        )
+                    ),
+                    0,
+                    30
+                );
+            };
+
+            error_log(
+                'SAUDACAO_LID_ESTRUTURA ' .
+                json_encode([
+                    'campos_data' => $filtrarCampos($dadosMensagem),
+                    'campos_key' => $filtrarCampos($chaveMensagem)
+                ])
+            );
+        }
+    }
+
     // 3. Ignora mensagens enviadas pela propria barbearia.
     if (($chaveMensagem['fromMe'] ?? null) !== false) {
         responderWebhook(200, [
