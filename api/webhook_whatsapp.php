@@ -120,16 +120,6 @@ try {
         ]);
     }
 
-    // Autorizacao para futuros testes de envio real.
-    // Por enquanto, apenas calcula a permissao.
-    // Nao envia mensagens nem altera o modo diagnostico.
-    require_once __DIR__ . '/../helpers/autorizacao_saudacao.php';
-
-    $envioRealAutorizado = envioSaudacaoAutorizado(
-        $config,
-        $whatsapp
-    );
-
     // 6. Identifica a barbearia pela instancia.
     $slug = substr($instancia, strlen('barber_'));
 
@@ -153,6 +143,15 @@ try {
             'motivo' => 'barbearia_nao_encontrada'
         ]);
     }
+    // Autoriza testes somente para a barbearia
+    // e o telefone definidos na configuracao privada.
+    require_once __DIR__ . '/../helpers/autorizacao_saudacao.php';
+
+    $envioRealAutorizado = envioSaudacaoAutorizado(
+        $config,
+        $whatsapp,
+        (int) $barbearia['id']
+    );
 
     // 7. Busca o cliente somente dentro da barbearia.
     $stmt = $db->prepare("
@@ -285,20 +284,41 @@ try {
     // podera prosseguir para o processamento.
     $diagnosticoEfetivo = $modoDiagnostico === true;
 
-    // Trava temporaria de desenvolvimento:
-    // impede a execucao do envio real.
-    $liberacaoFinalEnvio = false;
+    // Liberacao final controlada por configuracao privada.
+    // Exige telefone, barbearia e autorizacao explicitos.
+    $liberacaoFinalEnvio =
+        ($config['whatsapp_saudacao_liberacao_final'] ?? false) === true
+        && $modoTesteControlado
+        && !$diagnosticoEfetivo;
+
+    // Configuracoes privadas da Evolution API.
+    // Carregadas somente para o telefone autorizado
+    // e fora do modo diagnostico.
+    $apiUrlBase = '';
+    $apiKey = '';
+
+    if (!$diagnosticoEfetivo && $modoTesteControlado) {
+        $apiUrlBase = rtrim(
+            (string) ($config['evolution_url'] ?? ''),
+            '/'
+        );
+
+        $apiKey = trim(
+            (string) ($config['evolution_api_key'] ?? '')
+        );
+    }
 
     $resultadoProcessamento = processarSaudacaoWhatsapp(
         $db,
         (int) $barbearia['id'],
         $whatsapp,
         $mensagem,
-        '',
+        $apiUrlBase,
         $instancia,
-        '',
+        $apiKey,
         $diagnosticoEfetivo,
-        $liberacaoFinalEnvio && $modoTesteControlado
+        $liberacaoFinalEnvio && $modoTesteControlado,
+        $config
     );
 
     // Interpreta o resultado sem expor dados do cliente.

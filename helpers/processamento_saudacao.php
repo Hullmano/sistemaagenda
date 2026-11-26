@@ -3,6 +3,7 @@
 
 require_once __DIR__ . '/controle_saudacao.php';
 require_once __DIR__ . '/envio_saudacao.php';
+require_once __DIR__ . '/autorizacao_saudacao.php';
 
 /**
  * Coordena o processamento de uma saudacao.
@@ -19,7 +20,8 @@ function processarSaudacaoWhatsapp(
     string $instancia,
     string $apiKey,
     bool $modoDiagnostico = true,
-    bool $permitirEnvioReal = false
+    bool $permitirEnvioReal = false,
+    array $configAutorizacao = []
 ): array {
         // Diagnostico: nao reserva e nao envia mensagens.
         if ($modoDiagnostico) {
@@ -29,11 +31,15 @@ function processarSaudacaoWhatsapp(
             ];
         }
 
-        // Trava adicional de seguranca.
-        // Ainda nao liberaremos o envio nesta etapa.
-        $integracaoLiberada = false;
+        // Confere a autorizacao dentro do processamento.
+        // Exige liberacao explicita, barbearia e telefone corretos.
+        $telefoneAutorizado = envioSaudacaoAutorizado(
+            $configAutorizacao,
+            $whatsapp,
+            $barbeariaId
+        );
 
-        if (!$permitirEnvioReal || !$integracaoLiberada) {
+        if (!$permitirEnvioReal || !$telefoneAutorizado) {
             return [
                 'status' => 'nao_implementado',
                 'processado' => false

@@ -9,24 +9,30 @@
  */
 function envioSaudacaoAutorizado(
     array $config,
-    string $whatsapp
+    string $whatsapp,
+    int $barbeariaId
 ): bool {
-
     if (($config['whatsapp_saudacao_envio_ativo'] ?? false) !== true) {
+        return false;
+    }
+
+    $barbeariaAutorizada = $config['whatsapp_saudacao_barbearia_teste'] ?? null;
+
+    if (
+        !is_int($barbeariaAutorizada) ||
+        $barbeariaAutorizada <= 0 ||
+        $barbeariaId !== $barbeariaAutorizada
+    ) {
         return false;
     }
 
     $telefoneAutorizado = $config['whatsapp_saudacao_telefone_teste'] ?? null;
 
-    if (!is_string($telefoneAutorizado)) {
-        return false;
-    }
-
-    if (!preg_match('/^55[0-9]{10,11}$/', $telefoneAutorizado)) {
-        return false;
-    }
-
-    if (!preg_match('/^55[0-9]{10,11}$/', $whatsapp)) {
+    if (
+        !is_string($telefoneAutorizado) ||
+        !preg_match('/^55[0-9]{10,11}$/', $telefoneAutorizado) ||
+        !preg_match('/^55[0-9]{10,11}$/', $whatsapp)
+    ) {
         return false;
     }
 
